@@ -1,0 +1,9 @@
+name: import_cleaner
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  file: ^7.0.1
+  analyzer: ^9.0.0
+  scoped_deps: ^0.1.0+1

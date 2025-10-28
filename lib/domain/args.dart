@@ -1,0 +1,154 @@
+class Args {
+  const Args({
+    Map<String, dynamic>? args,
+    List<String>? rest,
+    List<String>? path,
+  }) : _args = args ?? const {},
+       _rest = rest ?? const [],
+       _path = path ?? const [];
+
+  factory Args.parse(List<String> args) {
+    // --no-<key> should be false under <key>
+    // --<key> should be true under <key>
+    // --key=value should be value under key
+    final mapped = <String, dynamic>{};
+    final rest = <String>[];
+    final path = <String>[];
+
+    void add(String rawKey, dynamic rawValue) {
+      final key = switch (rawKey.split('--')) {
+        [final key] => key,
+        [_, final key] => key,
+        _ => throw ArgumentError('Invalid key: $rawKey'),
+      };
+
+      final value = switch (rawValue) {
+        final String string
+            when string.contains(RegExp(r'^".*"$')) ||
+                string.contains(RegExp(r"^'.*'$")) =>
+          string.substring(1, string.length - 1),
+        final value => value,
+      };
+
+      if (mapped[key] case null) {
+        mapped[key] = value;
+        return;
+      }
+
+      // add to existing list of values
+      // ignore: strict_raw_type
+      if (mapped[key] case final Iterable list) {
+        mapped[key] = list.followedBy([value]);
+        return;
+      }
+
+      // starts a new list
+      mapped[key] = [mapped[key], value];
+    }
+
+    var pathIsParsed = false;
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+
+      if (!arg.startsWith('--')) {
+        if (pathIsParsed) {
+          rest.add(arg);
+        } else {
+          path.add(arg);
+        }
+        continue;
+      }
+
+      if (!pathIsParsed) {
+        pathIsParsed = true;
+      }
+
+      if (arg.split('=') case [final key, final value]) {
+        add(key, value);
+        continue;
+      }
+
+      if (arg.split('--no-') case [_, final key]) {
+        mapped[key] = false;
+        continue;
+      }
+
+      final key = arg.substring(2);
+
+      if (i + 1 < args.length) {
+        if (args[i + 1] case final String value when !value.startsWith('--')) {
+          add(key, value);
+          i++;
+          continue;
+        }
+      }
+
+      mapped[key] = true;
+    }
+
+    return Args(args: mapped, rest: rest, path: path);
+  }
+
+  final Map<String, dynamic> _args;
+  final List<String> _rest;
+  final List<String> _path;
+
+  List<String> get rest => List.unmodifiable(_rest);
+  List<String> get path => List.unmodifiable(_path);
+  List<String> get keys => _args.keys.toList();
+
+  Map<String, bool> get flags {
+    final flags = <String, bool>{};
+
+    for (final entry in _args.entries) {
+      if (entry.value case final bool value) {
+        flags[entry.key] = value;
+      }
+    }
+
+    return Map.unmodifiable(flags);
+  }
+
+  Map<String, dynamic> get values => Map.unmodifiable(_args);
+
+  bool wasParsed(String key) => _args[key] != null;
+
+  T get<T>(String key) {
+    final result = getOrNull<dynamic>(key);
+    if (result == null) {
+      throw ArgumentError('Flag/option "$key" was not parsed');
+    }
+
+    if (result case final T value) {
+      return value;
+    }
+
+    throw ArgumentError('Flag/option "$key" was not parsed as $T: $result');
+  }
+
+  T? getOrNull<T>(String key) {
+    if (!wasParsed(key)) {
+      return null;
+    }
+
+    if (_args[key] case final T value) {
+      return value;
+    }
+
+    return null;
+  }
+
+  dynamic operator [](String key) => getOrNull<dynamic>(key);
+
+  @override
+  String toString() {
+    final sb = StringBuffer();
+    for (final entry in _args.entries) {
+      sb.write('${entry.key}: ${entry.value} ');
+    }
+    if (_rest.isNotEmpty) {
+      sb.write('rest: ${_rest.join(' ')}');
+    }
+    return 'Args(${sb.toString().trim()})';
+  }
+}
