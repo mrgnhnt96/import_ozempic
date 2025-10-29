@@ -23,12 +23,26 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
-    // Example: `ClassName.staticMember`
-    final targetElement = node.prefix.element;
-    final memberElement = node.identifier.element;
+    // Example: `context.extensionName`
+    if (node.identifier.element case ExecutableElement(
+      :final ExtensionElement enclosingElement,
+    )) {
+      extensions.add(enclosingElement);
+      super.visitPrefixedIdentifier(node);
+      return;
+    }
 
-    // Only handle cases where the member is a static declaration.
-    if (memberElement is ExecutableElement && memberElement.isStatic) {
+    // Example: `ClassName.staticMethod()` or `ClassName.staticField`
+    final isStatic = switch (node.identifier.element) {
+      ExecutableElement(isStatic: true) => true,
+      FieldElement(isStatic: true) => true,
+      _ => false,
+    };
+
+    // Only handle static members (methods, fields, getters, setters)
+    if (isStatic) {
+      final targetElement = node.prefix.element;
+
       if (targetElement is ClassElement) {
         _addType(targetElement.thisType);
       } else if (targetElement is EnumElement) {
@@ -48,7 +62,6 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   void visitPropertyAccess(PropertyAccess node) {
     // Handles instance property access like `context.foo`
     Element? element;
-
     PropertyAccess access = node;
 
     while (element == null) {
