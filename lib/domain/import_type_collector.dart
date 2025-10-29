@@ -9,6 +9,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   ImportTypeCollector();
 
   final referencedTypes = <InterfaceType>{};
+  final extensions = <ExtensionElement>{};
 
   @override
   void visitNamedType(NamedType node) {
@@ -40,9 +41,30 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   @override
   void visitPropertyAccess(PropertyAccess node) {
     // Handles instance property access like `context.foo`
-    final targetType = node.target?.staticType;
-    if (targetType is InterfaceType) {
-      _addType(targetType);
+    Element? element;
+
+    PropertyAccess access = node;
+
+    while (element == null) {
+      var shouldBreak = false;
+      switch (access.realTarget) {
+        case PropertyAccess(:final PropertyAccess realTarget):
+          access = realTarget;
+        case PropertyAccess(:final PrefixedIdentifier realTarget):
+          element = realTarget.element?.enclosingElement;
+        case SimpleIdentifier(element: final e):
+          element = e;
+        case PrefixedIdentifier(element: final e?):
+          element = e.enclosingElement;
+        default:
+          shouldBreak = true;
+          break;
+      }
+      if (shouldBreak) break;
+    }
+
+    if (element case final ExtensionElement element) {
+      extensions.add(element);
     }
     super.visitPropertyAccess(node);
   }

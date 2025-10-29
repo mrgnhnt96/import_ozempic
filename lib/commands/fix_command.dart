@@ -92,6 +92,8 @@ class FixCommand {
       resolvedImport.addAll([
         for (final type in collector.referencedTypes)
           type.element.library.uri.toString(),
+        for (final extension in collector.extensions)
+          extension.library.uri.toString(),
       ]);
 
       resolvedImports.add(resolvedImport);
