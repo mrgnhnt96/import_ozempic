@@ -6,13 +6,13 @@ import 'package:analyzer/dart/element/type.dart';
 
 /// Collects all external type references that would require imports.
 class ImportTypeCollector extends RecursiveAstVisitor<void> {
-  /// The set of all referenced [InterfaceType]s not defined in this library.
-  final referencedTypes = <InterfaceType>{};
-
   ImportTypeCollector();
+
+  final referencedTypes = <InterfaceType>{};
 
   @override
   void visitNamedType(NamedType node) {
+    // Handles explicit type annotations (e.g., `Foo`, `List<Bar>`, etc.)
     final type = node.type;
     if (type is InterfaceType) {
       _addType(type);
@@ -22,7 +22,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
-    // Handles `Color.red` or `Namespace.MyClass`
+    // Handles `ClassName.staticMember` or `EnumType.value`
     final element = node.prefix.staticType?.element;
     if (element is ClassElement) {
       _addType(element.thisType);
@@ -39,13 +39,36 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitPropertyAccess(PropertyAccess node) {
-    // Handles things like `Color.red` when accessed via property
-    final target = node.target;
-    final targetType = target?.staticType;
-    if (targetType is InterfaceType && targetType.element is EnumElement) {
+    // Handles instance property access like `context.foo`
+    final targetType = node.target?.staticType;
+    if (targetType is InterfaceType) {
       _addType(targetType);
     }
     super.visitPropertyAccess(node);
+  }
+
+  @override
+  void visitComment(Comment node) {
+    // Handles `/// [TypeName]` doc comment references
+    for (final ref in node.references) {
+      final element = switch (ref.expression) {
+        SimpleIdentifier(:final element) => element,
+        PrefixedIdentifier(:final element) => element?.enclosingElement,
+        _ => null,
+      };
+
+      if (element case final ClassElement element) {
+        _addType(element.thisType);
+      } else if (element case final EnumElement element?) {
+        _addType(
+          element.instantiate(
+            typeArguments: const [],
+            nullabilitySuffix: NullabilitySuffix.none,
+          ),
+        );
+      }
+    }
+    super.visitComment(node);
   }
 
   void _addType(InterfaceType type) {
