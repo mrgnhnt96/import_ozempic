@@ -23,18 +23,24 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
-    // Handles `ClassName.staticMember` or `EnumType.value`
-    final element = node.prefix.staticType?.element;
-    if (element is ClassElement) {
-      _addType(element.thisType);
-    } else if (element is EnumElement) {
-      _addType(
-        element.instantiate(
-          typeArguments: const [],
-          nullabilitySuffix: NullabilitySuffix.none,
-        ),
-      );
+    // Example: `ClassName.staticMember`
+    final targetElement = node.prefix.element;
+    final memberElement = node.identifier.element;
+
+    // Only handle cases where the member is a static declaration.
+    if (memberElement is ExecutableElement && memberElement.isStatic) {
+      if (targetElement is ClassElement) {
+        _addType(targetElement.thisType);
+      } else if (targetElement is EnumElement) {
+        _addType(
+          targetElement.instantiate(
+            typeArguments: const [],
+            nullabilitySuffix: NullabilitySuffix.none,
+          ),
+        );
+      }
     }
+
     super.visitPrefixedIdentifier(node);
   }
 
@@ -66,6 +72,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     if (element case final ExtensionElement element) {
       extensions.add(element);
     }
+
     super.visitPropertyAccess(node);
   }
 
