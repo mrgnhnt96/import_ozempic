@@ -84,15 +84,18 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     if (isStatic) {
       final targetElement = node.prefix.element;
 
-      if (targetElement is ClassElement) {
-        _addType(targetElement.thisType);
-      } else if (targetElement is EnumElement) {
-        _addType(
-          targetElement.instantiate(
-            typeArguments: const [],
-            nullabilitySuffix: NullabilitySuffix.none,
-          ),
-        );
+      switch (targetElement) {
+        case ClassElement(:final thisType):
+          _addType(thisType);
+        case EnumElement(:final instantiate):
+          _addType(
+            instantiate(
+              typeArguments: const [],
+              nullabilitySuffix: NullabilitySuffix.none,
+            ),
+          );
+        case MixinElement(:final library):
+          _addLibrary(library);
       }
     }
 
