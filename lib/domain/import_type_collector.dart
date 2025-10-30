@@ -8,8 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 class ImportTypeCollector extends RecursiveAstVisitor<void> {
   ImportTypeCollector();
 
-  final referencedTypes = <InterfaceType>{};
-  final extensions = <ExtensionElement>{};
+  final libraries = <LibraryElement>{};
 
   @override
   void visitNamedType(NamedType node) {
@@ -22,12 +21,32 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    final element = node.element;
+
+    if (element?.displayName.startsWith('_') case true) {
+      super.visitSimpleIdentifier(node);
+      return;
+    }
+
+    /// Example: `pi`
+    if (node.element case PropertyAccessorElement(
+      :final library,
+      variable: TopLevelVariableElement(),
+    )) {
+      _addLibrary(library);
+    }
+
+    super.visitSimpleIdentifier(node);
+  }
+
+  @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
     // Example: `context.extensionName`
     if (node.identifier.element case ExecutableElement(
       :final ExtensionElement enclosingElement,
     )) {
-      extensions.add(enclosingElement);
+      _addLibrary(enclosingElement.library);
       super.visitPrefixedIdentifier(node);
       return;
     }
@@ -83,7 +102,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     }
 
     if (element case final ExtensionElement element) {
-      extensions.add(element);
+      _addLibrary(element.library);
     }
 
     super.visitPropertyAccess(node);
@@ -119,10 +138,14 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       return;
     }
 
+    _addLibrary(library);
+  }
+
+  void _addLibrary(LibraryElement library) {
     if (library.isDartCore) {
       return;
     }
 
-    referencedTypes.add(type);
+    libraries.add(library);
   }
 }
