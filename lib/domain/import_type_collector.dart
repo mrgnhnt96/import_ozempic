@@ -41,6 +41,28 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitMethodInvocation(MethodInvocation node) {
+    // Example: `Theme.of(context)`
+    if (node.methodName.element case MethodElement(
+      :final enclosingElement,
+      isStatic: true,
+    )) {
+      if (enclosingElement is ClassElement) {
+        _addType(enclosingElement.thisType);
+      } else if (enclosingElement is EnumElement) {
+        _addType(
+          enclosingElement.instantiate(
+            typeArguments: const [],
+            nullabilitySuffix: NullabilitySuffix.none,
+          ),
+        );
+      }
+    }
+
+    super.visitMethodInvocation(node);
+  }
+
+  @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
     // Example: `context.extensionName`
     if (node.identifier.element case ExecutableElement(
