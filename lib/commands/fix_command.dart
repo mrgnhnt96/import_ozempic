@@ -95,7 +95,9 @@ class FixCommand {
             .last
             .substring(1)
             .split("'")
-            .first;
+            .first
+            .split('/')
+            .last;
 
         final basename = fs.path.basename(partOfPath);
 
@@ -243,17 +245,27 @@ class FixCommand {
               if (hiddenType.library.resolved(path) == import) hiddenType.type,
         };
 
-        final alterations = config.alterations[fs.path.relative(path)];
+        final alterations = config.alterations.forPathAndImport(
+          path: fs.path.relative(path),
+          import: import,
+        );
+
+        final shown = <String>{};
 
         if (alterations case Alteration(
           import: final i,
           :final hide,
+          :final show,
         ) when i == import) {
           hidden.addAll(hide);
+          shown.addAll(show);
         }
 
         final hide = switch (hidden.toList()) {
-          [] => '',
+          [] => switch (shown.toList()) {
+            [] => '',
+            final list => 'show ${list.join(', ')}',
+          },
           final list => 'hide ${list.join(', ')}',
         };
 

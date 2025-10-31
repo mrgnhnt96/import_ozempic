@@ -1,4 +1,3 @@
-import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -152,6 +151,24 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     if (element?.displayName.startsWith('_') case true) {
       super.visitSimpleIdentifier(node);
       return;
+    }
+
+    if (node.element == null) {
+      switch (node) {
+        case SimpleIdentifierImpl(
+          scopeLookupResult: PrefixScopeLookupResult(
+                getter: ExecutableElement(
+                  enclosingElement: Element(:final library?),
+                ),
+              ) ||
+              PrefixScopeLookupResult(
+                setter: ExecutableElement(
+                  enclosingElement: Element(:final library?),
+                ),
+              ),
+        ):
+          _addLibrary(library);
+      }
     }
 
     switch (node.element) {

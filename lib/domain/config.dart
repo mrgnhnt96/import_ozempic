@@ -6,8 +6,8 @@ import 'package:import_cleaner/deps/log.dart';
 import 'package:yaml/yaml.dart';
 
 class Config {
-  Config({this.exclude = const [], List<Alteration> alterations = const []})
-    : alterations = Alterations(alterations);
+  Config({this.exclude = const [], Alterations? alterations})
+    : alterations = alterations ?? Alterations();
 
   factory Config.load(String path) {
     final file = fs.file(path);
@@ -28,15 +28,13 @@ class Config {
       _ => [],
     };
 
-    final alterations = switch (yaml['alterations']) {
-      final List<dynamic> list =>
-        list
-            .map((e) => Alteration.fromJson(e as Map<dynamic, dynamic>))
-            .toList(),
-      _ => <Alteration>[],
-    };
-
-    return Config(exclude: exclude as List<String>, alterations: alterations);
+    return Config(
+      exclude: exclude as List<String>,
+      alterations: switch (yaml['alterations']) {
+        final Map<dynamic, dynamic> map => Alterations.fromJson(map),
+        _ => null,
+      },
+    );
   }
 
   final List<String> exclude;
@@ -66,18 +64,67 @@ class Config {
 }
 
 class Alterations {
-  Alterations([this.alterations = const []])
-    : _alterations = {
-        for (final alteration in alterations)
-          fs.path.relative(alteration.path): alteration,
+  Alterations({this.paths = const [], this.imports = const []})
+    : _paths = {
+        for (final alteration in paths)
+          if (alteration.path case final String path)
+            fs.path.relative(path): alteration,
+      },
+      _imports = {
+        for (final alteration in imports) alteration.import: alteration,
       };
 
-  final List<Alteration> alterations;
+  factory Alterations.fromJson(Map<dynamic, dynamic> json) {
+    return Alterations(
+      paths: switch (json['paths']) {
+        final List<dynamic> list =>
+          list
+              .map((e) => Alteration.fromJson(e as Map<dynamic, dynamic>))
+              .toList(),
+        _ => [],
+      },
+      imports: switch (json['imports']) {
+        final List<dynamic> list =>
+          list
+              .map((e) => Alteration.fromJson(e as Map<dynamic, dynamic>))
+              .toList(),
+        _ => [],
+      },
+    );
+  }
 
-  final Map<String, Alteration> _alterations;
+  final List<Alteration> paths;
+  final List<Alteration> imports;
 
-  Alteration? operator [](String path) {
-    return _alterations[path] ?? _alterations[fs.path.relative(path)];
+  final Map<String, Alteration> _paths;
+  final Map<String, Alteration> _imports;
+
+  Alteration? forImport(String import) {
+    return _imports[import];
+  }
+
+  Alteration? forPath(String path) {
+    return _paths[path] ?? _paths[fs.path.relative(path)];
+  }
+
+  Alteration? forPathAndImport({required String path, required String import}) {
+    final i = forImport(import);
+    final p = switch (forPath(path)) {
+      final Alteration alteration when alteration.import == import =>
+        alteration,
+      _ => null,
+    };
+
+    if (i == null && p == null) {
+      return null;
+    }
+
+    return Alteration(
+      path: p?.path ?? path,
+      import: i?.import ?? import,
+      hide: [...?p?.hide, ...?i?.hide],
+      show: [...?p?.show, ...?i?.show],
+    );
   }
 }
 
@@ -91,7 +138,7 @@ class Alteration {
 
   factory Alteration.fromJson(Map<dynamic, dynamic> json) {
     return Alteration(
-      path: json['path'] as String,
+      path: json['path'] as String?,
       import: json['import'] as String,
       hide: switch (json['hide']) {
         final String string => [string],
@@ -106,7 +153,7 @@ class Alteration {
     );
   }
 
-  final String path;
+  final String? path;
   final String import;
   final List<String> hide;
   final List<String> show;
