@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:import_cleaner/deps/analyzer.dart';
 import 'package:import_cleaner/deps/fs.dart';
@@ -24,6 +26,34 @@ class FixCommand {
       return 1;
     }
 
+    if (await _fixImports(files) case final int exitCode) {
+      return exitCode;
+    }
+
+    log('');
+    log('Fixing unused imports in files');
+
+    final result = await Process.run('dart', [
+      'fix',
+      ...files,
+      '--apply',
+      '--code',
+      'unused_import',
+    ]);
+
+    if (result.exitCode != 0) {
+      log('Failed to fix analysis errors in files');
+      log(result.stderr);
+      return result.exitCode;
+    }
+
+    log('Analysis errors fixed in files');
+    log(result.stdout);
+
+    return 0;
+  }
+
+  Future<int?> _fixImports(List<String> files) async {
     final config = switch (args.getOrNull('config')) {
       final String path => Config.load(path),
       _ => Config(),
@@ -103,14 +133,32 @@ class FixCommand {
       }
 
       resolvedImport
-        ..addAll([for (final lib in collector.libraries) lib.uri.toString()])
-        ..namespaces.addAll(collector.importPrefixes);
+        ..addAll([
+          for (final lib in collector.libraries)
+            if (lib.firstFragment.source.fullName != resolvedImport.path)
+              lib.uri.toString(),
+        ])
+        ..namespaces.addAll(collector.importPrefixes)
+        ..hiddenTypes.addAll(
+          collector.hiddenTypes.map(
+            (e) => HiddenType(
+              type: e.element.displayName,
+              library: Import(e.element.library.uri.toString()),
+            ),
+          ),
+        );
 
       resolvedImports.add(resolvedImport);
     }
 
     for (final import in resolvedImports) {
-      final ResolvedImport(:path, :imports, :namespaces, :hasImports) = import;
+      final ResolvedImport(
+        :path,
+        :imports,
+        :namespaces,
+        :hasImports,
+        :hiddenTypes,
+      ) = import;
 
       if (path == null) continue;
       if (!hasImports) continue;
@@ -121,6 +169,8 @@ class FixCommand {
       int? importEnd;
       int? commentStart;
 
+      const skippable = ['show', 'hide', 'as'];
+
       for (final (index, line) in lines.indexed) {
         final trimmed = line.trim();
         if (trimmed.isEmpty) continue;
@@ -129,7 +179,7 @@ class FixCommand {
           continue;
         }
 
-        if (trimmed.startsWith('show') || trimmed.startsWith('hide')) {
+        if (skippable.any(trimmed.startsWith)) {
           continue;
         }
 
@@ -166,20 +216,26 @@ class FixCommand {
         final (import, :namespace) = i;
         final asClause = namespace != null ? 'as $namespace' : '';
 
-        final alteration = config.alterations[fs.path.relative(path)];
-
-        final expose = switch (alteration?.import == import) {
-          false => '',
-          true => switch (alteration) {
-            Alteration(:final hide) when hide.isNotEmpty =>
-              'hide ${hide.join(', ')}',
-            Alteration(:final show) when show.isNotEmpty =>
-              'show ${show.join(', ')}',
-            _ => '',
-          },
+        final hidden = {
+          for (final hiddenType in hiddenTypes)
+            if (hiddenType.library.resolved(path) == import) hiddenType.type,
         };
 
-        final statement = "import '$import' $asClause $expose".trim();
+        final alterations = config.alterations[fs.path.relative(path)];
+
+        if (alterations case Alteration(
+          import: final i,
+          :final hide,
+        ) when i == import) {
+          hidden.addAll(hide);
+        }
+
+        final hide = switch (hidden.toList()) {
+          [] => '',
+          final list => 'hide ${list.join(', ')}',
+        };
+
+        final statement = "import '$import' $asClause $hide".trim();
 
         return '$statement;';
       }
@@ -196,15 +252,20 @@ class FixCommand {
       fs.file(path).writeAsStringSync(content.trimLeft());
     }
 
-    return 0;
+    return null;
   }
 }
 
 class ResolvedImport {
-  ResolvedImport() : _imports = {}, parts = {}, namespaces = {};
+  ResolvedImport()
+    : _imports = {},
+      parts = {},
+      namespaces = {},
+      hiddenTypes = {};
 
   String? path;
   final Set<String> parts;
+  final Set<HiddenType> hiddenTypes;
   final Map<String, String> namespaces;
   final Set<Import> _imports;
 
@@ -290,6 +351,13 @@ class ResolvedImport {
   }
 }
 
+class HiddenType {
+  const HiddenType({required this.type, required this.library});
+
+  final String type;
+  final Import library;
+}
+
 class Import {
   const Import(this._path);
 
@@ -305,16 +373,8 @@ class Import {
       );
     }
 
-    if (isPackage) {
-      final srcPath = _path.split(RegExp(r'package:\w+/')).last;
-
-      if (root.endsWith(srcPath)) {
-        return null;
-      }
-    }
-
     if (_path == 'dart:_http') {
-      return null;
+      return 'dart:io';
     }
 
     return _path;

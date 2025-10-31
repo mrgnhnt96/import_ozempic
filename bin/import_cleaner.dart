@@ -15,7 +15,7 @@ void main(List<String> arguments) async {
   Directory.current =
       '/Users/morgan/Documents/develop.nosync/couchsurfing/pillows/apps/mobile';
 
-  run(['fix', 'packages/theme', '--config', 'import_cleaner.yaml']);
+  run(['fix', 'packages/ui', '--config', 'import_cleaner.yaml']);
 }
 
 void run(List<String> arguments) async {
