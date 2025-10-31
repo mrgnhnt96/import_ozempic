@@ -5,6 +5,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
+import 'package:analyzer/src/dart/element/scope.dart';
 
 /// Collects all external type references that would require imports.
 class ImportTypeCollector extends RecursiveAstVisitor<void> {
@@ -12,19 +13,54 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   final libraries = <LibraryElement>{};
   // Example: 'dart:math' -> 'math'
-  final importPrefixes = <String, String>{};
   final hiddenTypes = <InterfaceType>{};
-  final prefixedIdentifiers = <String, List<InterfaceType>>{};
+  final prefixedIdentifiers = <String, List<LibraryElement>>{};
+
+  @override
+  void visitPatternFieldName(PatternFieldName node) {
+    // Find the parent pattern
+    final parentPattern = node.thisOrAncestorOfType<ObjectPattern>();
+    final parentType = parentPattern?.type.type;
+
+    if (parentType is InterfaceType) {
+      final objectFields = {
+        for (final field in parentType.element.fields) field.displayName,
+      };
+
+      final patternFields = {
+        if (parentPattern != null)
+          for (final field in parentPattern.fields)
+            if (field.effectiveName case final String name) name,
+      };
+
+      final needsExtLookup = patternFields.difference(objectFields).isNotEmpty;
+
+      if (needsExtLookup) {
+        final unit = node.thisOrAncestorOfType<CompilationUnit>();
+        final extensions = switch (unit?.declaredFragment?.scope) {
+          LibraryFragmentScope(:final accessibleExtensions) =>
+            accessibleExtensions,
+          _ => <ExtensionElement>[],
+        };
+
+        for (final ext in extensions) {
+          if (ext.extendedType case InterfaceType(
+            element: Element(:final displayName),
+          )) {
+            if (displayName == parentType.element.displayName) {
+              // ext.getGetter(node.name.lexeme)
+              _addLibrary(ext.library);
+            }
+          }
+        }
+      }
+    }
+
+    super.visitPatternFieldName(node);
+  }
 
   @override
   void visitImportDirective(ImportDirective node) {
-    if (node case ImportDirective(
-      libraryImport: LibraryImport(:final importedLibrary?),
-      prefix: SimpleIdentifier(element: PrefixElement(:final String name)),
-    )) {
-      _addImportPrefix(importedLibrary, name);
-    }
-
     for (final combination in node.combinators) {
       switch (combination) {
         case HideCombinator(:final hiddenNames):
@@ -68,7 +104,17 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       case NamedType(name: Token(lexeme: 'Future' || 'Stream')):
         break;
       // Example: `Foo`, `List<Bar>`
-      case NamedType(:final InterfaceType type, :final typeArguments):
+      case NamedType(
+        :final InterfaceType type,
+        :final typeArguments,
+        :final importPrefix,
+      ):
+        if (importPrefix case ImportPrefixReference(
+          name: Token(:final lexeme),
+        )) {
+          (prefixedIdentifiers[lexeme] ??= []).add(type.element.library);
+        }
+
         _addType(type);
 
         if (typeArguments?.arguments case final args?) {
@@ -89,8 +135,11 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitImportPrefixReference(ImportPrefixReference node) {
-    if (node.element case final PrefixElement element) {
-      _addNamespace(element);
+    if (node case ImportPrefixReference(
+      :final PrefixElement element,
+      parent: NamedType(element: Element(:final library?)),
+    )) {
+      (prefixedIdentifiers[element.displayName] ??= []).add(library);
     }
 
     super.visitImportPrefixReference(node);
@@ -131,7 +180,11 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   void visitMethodInvocation(MethodInvocation node) {
     // Example: `math.max(1, 2)`
     if (node.target case SimpleIdentifier(:final PrefixElement element)) {
-      _addNamespace(element);
+      if (node.methodName case SimpleIdentifier(
+        element: Element(:final library?),
+      )) {
+        (prefixedIdentifiers[element.displayName] ??= []).add(library);
+      }
     }
 
     switch (node.methodName.element) {
@@ -174,16 +227,19 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       // Example: `math.pi`
       case SimpleIdentifier(:final PrefixElement element):
         if (node.staticType case final InterfaceType type) {
-          (prefixedIdentifiers[element.displayName] ??= []).add(type);
+          (prefixedIdentifiers[element.displayName] ??= []).add(
+            type.element.library,
+          );
         }
-        _addNamespace(element);
 
       // Example: `HttpOverrides.global`
-      case SimpleIdentifier(element: ClassElement(:final library)):
-        _addLibrary(library);
-
-      // Example: `typedef LogLevel = Level --> LogLevel.info
-      case SimpleIdentifier(element: TypeAliasElement(:final library)):
+      case SimpleIdentifier(
+        element: ClassElement(:final library) ||
+            EnumElement(:final library) ||
+            ExtensionTypeElement(:final library) ||
+            // Example: `typedef LogLevel = Level --> LogLevel.info
+            TypeAliasElement(:final library),
+      ):
         _addLibrary(library);
     }
 
@@ -238,12 +294,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
           element = realTarget.element?.enclosingElement;
         case SimpleIdentifier(element: final e):
           element = e;
-        case PrefixedIdentifier(
-          element: final e?,
-          prefix: SimpleIdentifier(element: final PrefixElement prefix),
-        ):
-          _addNamespace(prefix);
-
+        case PrefixedIdentifier(element: final e?):
           switch (e) {
             case EnumElement(:final instantiate):
               _addType(
@@ -313,27 +364,5 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     }
 
     libraries.add(library);
-  }
-
-  void _addNamespace(PrefixElement element) {
-    if (element case PrefixElement(
-      :final displayName,
-      imports: [LibraryImport(:final importedLibrary?), ...],
-    )) {
-      _addImportPrefix(importedLibrary, displayName);
-    }
-  }
-
-  void _addImportPrefix(LibraryElement library, String name) {
-    final import = library.uri.toString();
-    if (importPrefixes.containsKey(import)) {
-      if (importPrefixes[import] == name) {
-        return;
-      }
-
-      throw Exception('Duplicate import prefix: $import -> $name');
-    }
-
-    importPrefixes[import] = name;
   }
 }

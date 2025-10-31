@@ -39,6 +39,8 @@ class FixCommand {
       '--apply',
       '--code',
       'unused_import',
+      '--code',
+      'unnecessary_import',
     ]);
 
     if (result.exitCode != 0) {
@@ -138,7 +140,6 @@ class FixCommand {
             if (lib.firstFragment.source.fullName != resolvedImport.path)
               lib.uri.toString(),
         ])
-        ..namespaces.addAll(collector.importPrefixes)
         ..hiddenTypes.addAll(
           collector.hiddenTypes.map(
             (e) => HiddenType(
@@ -150,10 +151,7 @@ class FixCommand {
         ..prefixedIdentifiers.addAll({
           for (final MapEntry(:key, :value)
               in collector.prefixedIdentifiers.entries)
-            key: [
-              for (final type in value)
-                Import(type.element.library.uri.toString()),
-            ],
+            key: [for (final type in value) Import(type.uri.toString())],
         });
 
       resolvedImports.add(resolvedImport);
@@ -163,7 +161,6 @@ class FixCommand {
       final ResolvedImport(
         :path,
         :imports,
-        :namespaces,
         :hasImports,
         :hiddenTypes,
         :prefixedIdentifiers,
@@ -230,14 +227,20 @@ class FixCommand {
       final (:dart, :relative, :package) = imports;
 
       String toStatement(String import) {
-        final asClause = switch (prefixByPath[import]) {
+        final prefix = switch (prefixByPath[import]) {
+          final String prefix => prefix,
+          _ => null,
+        };
+
+        final asClause = switch (prefix) {
           final String prefix => 'as $prefix',
           _ => '',
         };
 
         final hidden = {
-          for (final hiddenType in hiddenTypes)
-            if (hiddenType.library.resolved(path) == import) hiddenType.type,
+          if (prefix == null)
+            for (final hiddenType in hiddenTypes)
+              if (hiddenType.library.resolved(path) == import) hiddenType.type,
         };
 
         final alterations = config.alterations[fs.path.relative(path)];
@@ -279,44 +282,17 @@ class ResolvedImport {
   ResolvedImport()
     : _imports = {},
       parts = {},
-      namespaces = {},
       hiddenTypes = {},
       prefixedIdentifiers = {};
 
   String? path;
   final Set<String> parts;
   final Set<HiddenType> hiddenTypes;
-  final Map<String, String> namespaces;
   // Example: 'math' -> [pi, max]
   final Map<String, List<Import>> prefixedIdentifiers;
   final Set<Import> _imports;
 
   bool get hasImports => _imports.isNotEmpty;
-
-  Map<String, String> get _namespaces {
-    final namespaces = <String, String>{};
-
-    for (final MapEntry(key: path, value: namespace)
-        in this.namespaces.entries) {
-      final import = Import(path);
-
-      if (!import.isPackage) {
-        namespaces[path] = namespace;
-        continue;
-      }
-
-      final isBarrelImport = RegExp(r'package:\w+\/\w+\.dart').hasMatch(path);
-
-      if (isBarrelImport) {
-        final package = path.split('/').first;
-        namespaces[package] = namespace;
-      } else {
-        namespaces[path] = namespace;
-      }
-    }
-
-    return namespaces;
-  }
 
   ({List<String> dart, List<String> relative, List<String> package})
   get imports {
