@@ -12,10 +12,10 @@ import 'package:scoped_deps/scoped_deps.dart';
 
 void main(List<String> arguments) async {
   // run(arguments);
-  run([
-    'fix',
-    '/Users/morgan/Documents/develop.nosync/couchsurfing/pillows/apps/mobile/packages/theme',
-  ]);
+  Directory.current =
+      '/Users/morgan/Documents/develop.nosync/couchsurfing/pillows/apps/mobile';
+
+  run(['fix', 'packages/theme', '--config', 'import_cleaner.yaml']);
 }
 
 void run(List<String> arguments) async {

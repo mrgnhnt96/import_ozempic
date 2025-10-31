@@ -32,9 +32,14 @@ class Analyzer {
   String get sdkPath => fs.file(platform.resolvedExecutable).parent.parent.path;
 
   void initialize({required String root}) {
+    final path = switch (fs.path.isAbsolute(root)) {
+      true => root,
+      false => fs.file(root).absolute.path,
+    };
+
     try {
       _analysisCollection = AnalysisContextCollection(
-        includedPaths: [root],
+        includedPaths: [path],
         resourceProvider: _provider,
         sdkPath: sdkPath,
       );
@@ -52,7 +57,12 @@ class Analyzer {
   Future<List<AnalyzeFileResult>> analyze(List<String> paths) async {
     final result = <AnalyzeFileResult>[];
 
-    for (final path in paths) {
+    for (final p in paths) {
+      final path = switch (fs.path.isAbsolute(p)) {
+        true => p,
+        false => fs.file(p).absolute.path,
+      };
+
       if (fs.isDirectorySync(path)) {
         result.addAll(await _analyzeDirectory(path));
       } else if (fs.isFileSync(path)) {
