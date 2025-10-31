@@ -146,7 +146,15 @@ class FixCommand {
               library: Import(e.element.library.uri.toString()),
             ),
           ),
-        );
+        )
+        ..prefixedIdentifiers.addAll({
+          for (final MapEntry(:key, :value)
+              in collector.prefixedIdentifiers.entries)
+            key: [
+              for (final type in value)
+                Import(type.element.library.uri.toString()),
+            ],
+        });
 
       resolvedImports.add(resolvedImport);
     }
@@ -158,7 +166,16 @@ class FixCommand {
         :namespaces,
         :hasImports,
         :hiddenTypes,
+        :prefixedIdentifiers,
       ) = import;
+
+      final prefixByPath = <String, String>{
+        for (final MapEntry(:key, :value) in prefixedIdentifiers.entries)
+          for (final import in value)
+            if (path != null)
+              if (import.resolved(path) case final String resolved)
+                resolved: key,
+      };
 
       if (path == null) continue;
       if (!hasImports) continue;
@@ -212,9 +229,11 @@ class FixCommand {
 
       final (:dart, :relative, :package) = imports;
 
-      String toStatement((String, {String? namespace}) i) {
-        final (import, :namespace) = i;
-        final asClause = namespace != null ? 'as $namespace' : '';
+      String toStatement(String import) {
+        final asClause = switch (prefixByPath[import]) {
+          final String prefix => 'as $prefix',
+          _ => '',
+        };
 
         final hidden = {
           for (final hiddenType in hiddenTypes)
@@ -261,12 +280,15 @@ class ResolvedImport {
     : _imports = {},
       parts = {},
       namespaces = {},
-      hiddenTypes = {};
+      hiddenTypes = {},
+      prefixedIdentifiers = {};
 
   String? path;
   final Set<String> parts;
   final Set<HiddenType> hiddenTypes;
   final Map<String, String> namespaces;
+  // Example: 'math' -> [pi, max]
+  final Map<String, List<Import>> prefixedIdentifiers;
   final Set<Import> _imports;
 
   bool get hasImports => _imports.isNotEmpty;
@@ -296,11 +318,7 @@ class ResolvedImport {
     return namespaces;
   }
 
-  ({
-    List<(String, {String? namespace})> dart,
-    List<(String, {String? namespace})> relative,
-    List<(String, {String? namespace})> package,
-  })
+  ({List<String> dart, List<String> relative, List<String> package})
   get imports {
     final path = this.path;
 
@@ -308,35 +326,28 @@ class ResolvedImport {
       throw Exception('Path is missing, cannot resolve imports');
     }
 
-    final dart = <(String, {String? namespace})>{};
-    final relative = <(String, {String? namespace})>{};
-    final package = <(String, {String? namespace})>{};
-
-    final namespaces = _namespaces;
+    final dart = <String>{};
+    final relative = <String>{};
+    final package = <String>{};
 
     for (final import in _imports) {
       final resolved = import.resolved(path);
       if (resolved == null) continue;
 
-      final namespace = switch (import.isPackage) {
-        true => namespaces[resolved.split('/').first] ?? namespaces[resolved],
-        false => namespaces[resolved],
-      };
-
       switch (import) {
         case Import(isDart: true):
-          dart.add((resolved, namespace: namespace));
+          dart.add(resolved);
         case Import(isRelative: true):
-          relative.add((resolved, namespace: namespace));
+          relative.add(resolved);
         case Import(isPackage: true):
-          package.add((resolved, namespace: namespace));
+          package.add(resolved);
       }
     }
 
     return (
-      dart: dart.toList()..sort((a, b) => a.$1.compareTo(b.$1)),
-      relative: relative.toList()..sort((a, b) => a.$1.compareTo(b.$1)),
-      package: package.toList()..sort((a, b) => a.$1.compareTo(b.$1)),
+      dart: dart.toList()..sort(),
+      relative: relative.toList()..sort(),
+      package: package.toList()..sort(),
     );
   }
 

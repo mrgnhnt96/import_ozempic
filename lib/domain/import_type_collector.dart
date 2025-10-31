@@ -14,6 +14,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   // Example: 'dart:math' -> 'math'
   final importPrefixes = <String, String>{};
   final hiddenTypes = <InterfaceType>{};
+  final prefixedIdentifiers = <String, List<InterfaceType>>{};
 
   @override
   void visitImportDirective(ImportDirective node) {
@@ -172,6 +173,9 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     switch (node.prefix) {
       // Example: `math.pi`
       case SimpleIdentifier(:final PrefixElement element):
+        if (node.staticType case final InterfaceType type) {
+          (prefixedIdentifiers[element.displayName] ??= []).add(type);
+        }
         _addNamespace(element);
 
       // Example: `HttpOverrides.global`
