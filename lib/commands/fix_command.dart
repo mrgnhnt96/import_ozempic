@@ -64,13 +64,15 @@ class FixCommand {
 
     analyzer.initialize(root: fs.currentDirectory.path);
 
-    final results = await analyzer.analyze(files);
+    final cleanedFiles = [
+      for (final file in files)
+        if (file == '.') fs.currentDirectory.path else file,
+    ];
 
-    final resultsByLibrary =
-        <
-          String,
-          List<(ParsedUnitResult, Future<ResolvedUnitResult> Function())>
-        >{};
+    final results = await analyzer.analyze(cleanedFiles);
+
+    final libraries =
+        <(ParsedUnitResult, Future<ResolvedUnitResult> Function())>[];
 
     for (final result in results) {
       final (parsed, resolved) = result;
@@ -80,102 +82,34 @@ class FixCommand {
       }
 
       if (!parsed.isLibrary) {
-        final partOfDirective = parsed.unit.directives
-            .map((e) => e.toString())
-            .firstWhere((e) => e.contains('part of'), orElse: () => '');
-
-        if (partOfDirective.isEmpty) {
-          log(
-            'Skipping ${parsed.path} and it did not have a `part of` directive',
-          );
-          continue;
-        }
-
-        final partOfPath = partOfDirective
-            .split(' ')
-            .last
-            .substring(1)
-            .split("'")
-            .first
-            .split('/')
-            .last;
-
-        final basename = fs.path.basename(partOfPath);
-
-        (resultsByLibrary[basename] ??= []).add(result);
+        // We _could_ resolve the library here and add it to the list..
+        // But it would be more expensive than to just "teach" the user to
+        // provide libraries (as opposed to parts)
         continue;
       }
 
-      final basename = fs.path.basename(parsed.path);
-
-      (resultsByLibrary[basename] ??= []).add(result);
+      libraries.add(result);
     }
 
-    if (resultsByLibrary.isEmpty) {
+    if (libraries.isEmpty) {
       log('No files were found to fix');
+      if (files.isNotEmpty) {
+        log('Provide files that do not contain `part of` directives');
+      }
       return 0;
     }
 
-    final resolvedImports = <ResolvedImport>[];
+    final futures = <Future<ResolvedImport>>[];
 
     log('Resolving imports:');
-    for (final results in resultsByLibrary.values) {
-      final collector = ImportTypeCollector();
-      final resolvedImport = ResolvedImport();
-
-      for (final result in results) {
-        final (parsed, resolved) = result;
-        resolvedImport.parts.add(parsed.path);
-        log('  ${fs.path.relative(parsed.path)}');
-
-        if (parsed.isLibrary) {
-          resolvedImport.path = parsed.path;
-        }
-
-        final library = await resolved();
-
-        library.unit.accept(collector);
-      }
-
-      resolvedImport
-        ..addAll([
-          for (final lib in collector.libraries)
-            if (lib.firstFragment.source.fullName != resolvedImport.path)
-              lib.uri.toString(),
-        ])
-        ..hiddenTypes.addAll(
-          collector.hiddenTypes.map(
-            (e) => HiddenType(
-              type: e.element.displayName,
-              library: Import(e.element.library.uri.toString()),
-            ),
-          ),
-        )
-        ..prefixedIdentifiers.addAll({
-          for (final MapEntry(:key, :value)
-              in collector.prefixedIdentifiers.entries)
-            key: [for (final type in value) Import(type.uri.toString())],
-        });
-
-      resolvedImports.add(resolvedImport);
+    for (final lib in libraries) {
+      futures.add(_resolveImport(lib));
     }
 
-    for (final import in resolvedImports) {
-      final ResolvedImport(
-        :path,
-        :imports,
-        :hasImports,
-        :hiddenTypes,
-        :prefixedIdentifiers,
-      ) = import;
+    final resolvedImports = await Future.wait(futures);
 
-      final prefixByPath = <String, String>{
-        for (final MapEntry(:key, :value) in prefixedIdentifiers.entries)
-          for (final import in value)
-            if (path != null)
-              if (import.resolved(path) case final String resolved)
-                resolved: key,
-      };
+    for (final import in resolvedImports) {
+      final ResolvedImport(:path, :imports, :hasImports) = import;
 
       if (path == null) continue;
       if (!hasImports) continue;
@@ -186,7 +120,7 @@ class FixCommand {
       int? importEnd;
       int? commentStart;
 
-      const skippable = ['show', 'hide', 'as'];
+      const skippable = ['as', 'hide', 'show', 'export'];
 
       for (final (index, line) in lines.indexed) {
         final trimmed = line.trim();
@@ -229,57 +163,12 @@ class FixCommand {
 
       final (:dart, :relative, :package) = imports;
 
-      String toStatement(String import) {
-        final prefix = switch (prefixByPath[import]) {
-          final String prefix => prefix,
-          _ => null,
-        };
-
-        final asClause = switch (prefix) {
-          final String prefix => 'as $prefix',
-          _ => '',
-        };
-
-        final hidden = {
-          if (prefix == null)
-            for (final hiddenType in hiddenTypes)
-              if (hiddenType.library.resolved(path) == import) hiddenType.type,
-        };
-
-        final alterations = config.alterations.forPathAndImport(
-          path: fs.path.relative(path),
-          import: import,
-        );
-
-        final shown = <String>{};
-
-        if (alterations case Alteration(
-          import: final i,
-          :final hide,
-          :final show,
-        ) when i == import) {
-          hidden.addAll(hide);
-          shown.addAll(show);
-        }
-
-        final hide = switch (hidden.toList()) {
-          [] => switch (shown.toList()) {
-            [] => '',
-            final list => 'show ${list.join(', ')}',
-          },
-          final list => 'hide ${list.join(', ')}',
-        };
-
-        final statement = "import '$import' $asClause $hide".trim();
-
-        return '$statement;';
-      }
-
       var content = [
-        contentStart.trim(),
-        if (dart.isNotEmpty) ...[...dart.map(toStatement), ''],
-        if (package.isNotEmpty) ...[...package.map(toStatement), ''],
-        if (relative.isNotEmpty) ...[...relative.map(toStatement), ''],
+        if (contentStart.trim() case final String start when start.isNotEmpty)
+          start,
+        if (dart.isNotEmpty) ...dart.followedBy(['']),
+        if (package.isNotEmpty) ...package.followedBy(['']),
+        if (relative.isNotEmpty) ...relative.followedBy(['']),
         contentEnd.trim(),
         '',
       ].join('\n');
@@ -289,23 +178,74 @@ class FixCommand {
 
     return null;
   }
+
+  Future<ResolvedImport> _resolveImport(
+    (ParsedUnitResult, Future<ResolvedUnitResult> Function()) lib,
+  ) async {
+    final collector = ImportTypeCollector();
+    final resolvedImport = ResolvedImport();
+
+    final (parsed, resolved) = lib;
+
+    log('  ${fs.path.relative(parsed.path)}');
+
+    if (parsed.isLibrary) {
+      resolvedImport.path = parsed.path;
+    }
+
+    final parts = await analyzer.analyze(_getParts(parsed));
+
+    for (final part in [lib].followedBy(parts)) {
+      final (_, resolved) = part;
+
+      final library = await resolved();
+
+      if (library.path case final String path
+          when path != resolvedImport.path) {
+        resolvedImport.parts.add(path);
+      }
+
+      library.unit.accept(collector);
+    }
+
+    return resolvedImport..addAll(collector.references);
+  }
+
+  List<String> _getParts(ParsedUnitResult parsed) {
+    Iterable<String> parts() sync* {
+      final lines = parsed.content.split('\n');
+
+      const avoid = ['export', 'import', 'library', 'as', 'show', 'hide', '//'];
+
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+        if (avoid.any(trimmed.startsWith)) continue;
+
+        if (!trimmed.startsWith('part')) {
+          break;
+        }
+
+        if (trimmed.split("'") case [_, final String part, ...]) {
+          yield fs.path.normalize(
+            fs.path.join(fs.path.dirname(parsed.path), part),
+          );
+        }
+      }
+    }
+
+    return parts().toList();
+  }
 }
 
 class ResolvedImport {
-  ResolvedImport()
-    : _imports = {},
-      parts = {},
-      hiddenTypes = {},
-      prefixedIdentifiers = {};
+  ResolvedImport() : parts = {}, references = {};
 
   String? path;
   final Set<String> parts;
-  final Set<HiddenType> hiddenTypes;
-  // Example: 'math' -> [pi, max]
-  final Map<String, List<Import>> prefixedIdentifiers;
-  final Set<Import> _imports;
+  final Set<Reference> references;
 
-  bool get hasImports => _imports.isNotEmpty;
+  bool get hasImports => references.isNotEmpty;
 
   ({List<String> dart, List<String> relative, List<String> package})
   get imports {
@@ -315,15 +255,46 @@ class ResolvedImport {
       throw Exception('Path is missing, cannot resolve imports');
     }
 
+    final imports = <String, Reference>{};
+
+    for (final ref in references) {
+      final import = ref.import.resolved(path);
+      if (import == null) {
+        continue;
+      }
+
+      if (imports.remove(import) case final Reference existing) {
+        if (existing.canJoin(ref)) {
+          imports[import] = existing.join(ref);
+        } else {
+          final key = '$import (${ref.prefix})';
+
+          if (imports.remove(key) case final Reference existing) {
+            if (existing.canJoin(ref)) {
+              imports[key] = existing.join(ref);
+            } else {
+              throw Exception('Unexpected duplicate import: $key');
+            }
+            continue;
+          }
+
+          imports[key] = ref;
+        }
+        continue;
+      }
+
+      imports[import] = ref;
+    }
+
     final dart = <String>{};
     final relative = <String>{};
     final package = <String>{};
 
-    for (final import in _imports) {
-      final resolved = import.resolved(path);
+    for (final ref in imports.values) {
+      final resolved = ref.importStatement(path);
       if (resolved == null) continue;
 
-      switch (import) {
+      switch (ref.import) {
         case Import(isDart: true):
           dart.add(resolved);
         case Import(isRelative: true):
@@ -340,14 +311,14 @@ class ResolvedImport {
     );
   }
 
-  void add(String path) {
-    _imports.add(Import(path));
+  void add(Reference reference) {
+    if (reference.canInclude(this)) {
+      references.add(reference);
+    }
   }
 
-  void addAll(Iterable<String> paths) {
-    for (final path in paths) {
-      add(path);
-    }
+  void addAll(Iterable<Reference> references) {
+    references.forEach(add);
   }
 }
 
@@ -395,4 +366,9 @@ class Import {
 
   @override
   int get hashCode => _path.hashCode;
+
+  @override
+  String toString() {
+    return _path;
+  }
 }

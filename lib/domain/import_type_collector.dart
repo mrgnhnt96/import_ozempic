@@ -11,10 +11,7 @@ import 'package:import_ozempic/domain/reference.dart';
 class ImportTypeCollector extends RecursiveAstVisitor<void> {
   ImportTypeCollector();
 
-  final libraries = <LibraryElement>{};
-  // Example: 'dart:math' -> 'math'
-  final hiddenTypes = <InterfaceType>{};
-  final prefixedIdentifiers = <String, List<LibraryElement>>{};
+  final references = <Reference>{};
 
   @override
   void visitPatternFieldName(PatternFieldName node) {
@@ -44,12 +41,11 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
         };
 
         for (final ext in extensions) {
-          if (ext.extendedType case InterfaceType(
-            element: Element(:final displayName),
-          )) {
-            if (displayName == parentType.element.displayName) {
-              // ext.getGetter(node.name.lexeme)
-              _addLibrary(ext.library);
+          if (ext.extendedType case InterfaceType(:final Element element)) {
+            if (element == parentType.element) {
+              references.add(
+                Reference(lib: ext.library, associatedElement: element),
+              );
             }
           }
         }
@@ -61,37 +57,90 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitImportDirective(ImportDirective node) {
+    final names = <(NodeList<SimpleIdentifier>, {bool hide, bool show})>[];
     for (final combination in node.combinators) {
       switch (combination) {
         case HideCombinator(:final hiddenNames):
-          for (final name in hiddenNames) {
-            switch (name.element) {
-              case ClassElement(:final thisType):
-                hiddenTypes.add(thisType);
-              case EnumElement(:final instantiate):
-                hiddenTypes.add(
-                  instantiate(
-                    typeArguments: const [],
-                    nullabilitySuffix: NullabilitySuffix.none,
-                  ),
-                );
-              case TypeAliasElement(:final library):
-                _addLibrary(library);
-              case TopLevelVariableElement(:final library):
-                _addLibrary(library);
-              case TopLevelFunctionElement(:final library):
-                _addLibrary(library);
-              case MethodElement(:final ExtensionElement enclosingElement):
-                _addLibrary(enclosingElement.library);
-              case ConstructorElement(:final library):
-                _addLibrary(library);
-              case FieldElement(:final enclosingElement, isStatic: true):
-                _addLibrary(enclosingElement.library);
-              default:
-                break;
+          names.add((hiddenNames, hide: true, show: false));
+        case ShowCombinator(:final shownNames):
+          names.add((shownNames, hide: false, show: true));
+      }
+    }
+
+    for (final (hiddenNames, :hide, :show) in names) {
+      for (final name in hiddenNames) {
+        switch (name.element) {
+          case ClassElement(:final thisType, :final library):
+            references.add(
+              Reference.optional(
+                lib: library,
+                associatedElement: thisType.element,
+                hide: hide,
+                show: show,
+              ),
+            );
+          case EnumElement(:final instantiate, :final library):
+            references.add(
+              Reference.optional(
+                lib: library,
+                associatedElement: instantiate(
+                  typeArguments: const [],
+                  nullabilitySuffix: NullabilitySuffix.none,
+                ).element,
+                hide: hide,
+                show: show,
+              ),
+            );
+          case TypeAliasElement(:final instantiate, :final library):
+            references.add(
+              Reference.optional(
+                lib: library,
+                associatedElement: instantiate(
+                  typeArguments: const [],
+                  nullabilitySuffix: NullabilitySuffix.none,
+                ).element,
+                hide: hide,
+                show: show,
+              ),
+            );
+          case MethodElement(:final ExtensionElement enclosingElement):
+            if (enclosingElement case Element(:final library?)) {
+              references.add(
+                Reference.optional(
+                  associatedElement: enclosingElement,
+                  lib: library,
+                  hide: hide,
+                  show: show,
+                ),
+              );
             }
-          }
-        case ShowCombinator():
+          case FieldElement(:final enclosingElement, isStatic: true):
+            if (enclosingElement case Element(:final library?)) {
+              references.add(
+                Reference.optional(
+                  associatedElement: enclosingElement,
+                  lib: library,
+                  hide: hide,
+                  show: show,
+                ),
+              );
+            }
+
+          case ConstructorElement(:final library):
+          case TopLevelVariableElement(:final library):
+          case TopLevelFunctionElement(:final library):
+          case Element(:final library?):
+            references.add(
+              Reference.optional(
+                associatedElement: name.element,
+                lib: library,
+                hide: hide,
+                show: show,
+              ),
+            );
+          default:
+            break;
+        }
       }
     }
 
@@ -109,13 +158,18 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
         :final typeArguments,
         :final importPrefix,
       ):
-        if (importPrefix case ImportPrefixReference(
-          name: Token(:final lexeme),
-        )) {
-          (prefixedIdentifiers[lexeme] ??= []).add(type.element.library);
-        }
+        final prefix = switch (importPrefix) {
+          ImportPrefixReference(name: Token(:final lexeme)) => lexeme,
+          _ => null,
+        };
 
-        _addType(type);
+        references.add(
+          Reference(
+            lib: type.element.library,
+            associatedElement: type.element,
+            prefix: prefix,
+          ),
+        );
 
         if (typeArguments?.arguments case final args?) {
           for (final arg in args) {
@@ -127,7 +181,9 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
       /// Example: `VoidCallback`
       case NamedType(:final TypeAliasElement element):
-        _addLibrary(element.library);
+        references.add(
+          Reference(lib: element.library, associatedElement: element),
+        );
     }
 
     super.visitNamedType(node);
@@ -139,7 +195,13 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       :final PrefixElement element,
       parent: NamedType(element: Element(:final library?)),
     )) {
-      (prefixedIdentifiers[element.displayName] ??= []).add(library);
+      references.add(
+        Reference.optional(
+          lib: library,
+          associatedElement: element,
+          prefix: element.displayName,
+        ),
+      );
     }
 
     super.visitImportPrefixReference(node);
@@ -154,41 +216,60 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       return;
     }
 
+    final prefix = switch (node) {
+      SimpleIdentifier(
+        parent: PrefixedIdentifier(
+          prefix: SimpleIdentifier(:final name, element: PrefixElement()),
+        ),
+      ) =>
+        name,
+      SimpleIdentifier(
+        parent: MethodInvocation(
+          target: SimpleIdentifier(:final name, element: PrefixElement()),
+        ),
+      ) =>
+        name,
+      _ => null,
+    };
+
     if (node.element == null) {
       switch (node) {
         case SimpleIdentifierImpl(
           scopeLookupResult: PrefixScopeLookupResult(
-                getter: ExecutableElement(
-                  enclosingElement: Element(:final library?),
-                ),
+                getter: ExecutableElement(:final enclosingElement),
               ) ||
               PrefixScopeLookupResult(
-                setter: ExecutableElement(
-                  enclosingElement: Element(:final library?),
-                ),
+                setter: ExecutableElement(:final enclosingElement),
               ),
         ):
-          _addLibrary(library);
+          if (enclosingElement case LibraryElement(:final library)) {
+            references.add(
+              Reference(
+                lib: library,
+                associatedElement: enclosingElement,
+                prefix: prefix,
+              ),
+            );
+          }
       }
     }
 
     switch (node.element) {
       case ClassElement(:final library):
-        _addLibrary(library);
       case PropertyAccessorElement(
         /// Example: `pi`
         :final library,
         variable: TopLevelVariableElement(),
       ):
-        _addLibrary(library);
-
       // Example: `pi`
       case TopLevelVariableElement(:final library):
-        _addLibrary(library);
-
       // Example: `max()`
       case TopLevelFunctionElement(:final library):
-        _addLibrary(library);
+        if (element != null) {
+          references.add(
+            Reference(lib: library, associatedElement: element, prefix: prefix),
+          );
+        }
     }
 
     super.visitSimpleIdentifier(node);
@@ -196,33 +277,73 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
+    final prefix = switch (node.target) {
+      SimpleIdentifier(:final name, element: PrefixElement()) => name,
+      _ => null,
+    };
+
     // Example: `math.max(1, 2)`
-    if (node.target case SimpleIdentifier(:final PrefixElement element)) {
-      if (node.methodName case SimpleIdentifier(
-        element: Element(:final library?),
-      )) {
-        (prefixedIdentifiers[element.displayName] ??= []).add(library);
-      }
+    switch (node.target) {
+      case SimpleIdentifier(:final PrefixElement element):
+        if (node.methodName case SimpleIdentifier(
+          element: Element(:final library?),
+        )) {
+          references.add(
+            Reference(lib: library, associatedElement: element, prefix: prefix),
+          );
+        }
+      case InstanceCreationExpression(:final InterfaceType staticType):
+        references.add(
+          Reference(
+            lib: staticType.element.library,
+            associatedElement: staticType.element,
+            prefix: prefix,
+          ),
+        );
     }
 
     switch (node.methodName.element) {
       /// Example: `context.extensionName(...)`
       case MethodElement(:final ExtensionElement enclosingElement):
-        _addLibrary(enclosingElement.library);
+        references.add(
+          Reference(
+            lib: enclosingElement.library,
+            associatedElement: enclosingElement,
+            prefix: prefix,
+          ),
+        );
 
       // Example: `Theme.of(context)` or `listEquals(...)`
       case MethodElement(:final enclosingElement, isStatic: true):
       case TopLevelFunctionElement(:final enclosingElement):
         switch (enclosingElement) {
           case LibraryElement(:final library):
-            _addLibrary(library);
+            references.add(
+              Reference(
+                lib: library,
+                associatedElement: enclosingElement,
+                prefix: prefix,
+              ),
+            );
           case ClassElement(:final thisType):
-            _addType(thisType);
+            references.add(
+              Reference(
+                lib: thisType.element.library,
+                associatedElement: thisType.element,
+                prefix: prefix,
+              ),
+            );
           case EnumElement(:final instantiate):
-            _addType(
-              instantiate(
-                typeArguments: const [],
-                nullabilitySuffix: NullabilitySuffix.none,
+            final type = instantiate(
+              typeArguments: const [],
+              nullabilitySuffix: NullabilitySuffix.none,
+            );
+
+            references.add(
+              Reference(
+                associatedElement: type.element,
+                lib: type.element.library,
+                prefix: prefix,
               ),
             );
         }
@@ -233,8 +354,10 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorReference(ConstructorReference node) {
-    if (node.constructorName.element case ConstructorElement(:final library)) {
-      _addLibrary(library);
+    if (node.constructorName.element case final ConstructorElement element) {
+      references.add(
+        Reference(lib: element.library, associatedElement: element),
+      );
     }
     super.visitConstructorReference(node);
   }
@@ -243,11 +366,17 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
     switch (node.prefix) {
       // Example: `math.pi`
-      case SimpleIdentifier(:final PrefixElement element):
-        if (node.staticType case final InterfaceType type) {
-          (prefixedIdentifiers[element.displayName] ??= []).add(
-            type.element.library,
-          );
+      case SimpleIdentifier(element: final PrefixElement prefix):
+        if (node.element case final Element element) {
+          if (element.library case final LibraryElement library) {
+            references.add(
+              Reference(
+                lib: library,
+                associatedElement: element,
+                prefix: prefix.displayName,
+              ),
+            );
+          }
         }
 
       // Example: `HttpOverrides.global`
@@ -258,27 +387,46 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
             // Example: `typedef LogLevel = Level --> LogLevel.info
             TypeAliasElement(:final library),
       ):
-        _addLibrary(library);
+        if (node.identifier.element case final element?) {
+          references.add(Reference(lib: library, associatedElement: element));
+        }
     }
 
     switch (node.identifier.element) {
       // Example: `context.extensionName`
       case ExecutableElement(:final ExtensionElement enclosingElement):
-        _addLibrary(enclosingElement.library);
+        references.add(
+          Reference(
+            lib: enclosingElement.library,
+            associatedElement: enclosingElement,
+          ),
+        );
 
       // Example: `ClassName.staticMethod()` or `ClassName.staticField`
       case ExecutableElement(isStatic: true) || FieldElement(isStatic: true):
         final targetElement = node.prefix.element;
         switch (targetElement) {
           case ClassElement(:final thisType):
-            _addType(thisType);
+            references.add(
+              Reference(
+                lib: thisType.element.library,
+                associatedElement: thisType.element,
+              ),
+            );
           case MixinElement(:final library):
-            _addLibrary(library);
+            references.add(
+              Reference(lib: library, associatedElement: targetElement),
+            );
           case EnumElement(:final instantiate):
-            _addType(
-              instantiate(
-                typeArguments: const [],
-                nullabilitySuffix: NullabilitySuffix.none,
+            final type = instantiate(
+              typeArguments: const [],
+              nullabilitySuffix: NullabilitySuffix.none,
+            );
+
+            references.add(
+              Reference(
+                associatedElement: type.element,
+                lib: type.element.library,
               ),
             );
         }
@@ -292,7 +440,7 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     if (node.propertyName.element case ExecutableElement(
       enclosingElement: final ExtensionElement e,
     )) {
-      _addLibrary(e.library);
+      references.add(Reference(lib: e.library, associatedElement: e));
       super.visitPropertyAccess(node);
       return;
     }
@@ -315,10 +463,14 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
         case PrefixedIdentifier(element: final e?):
           switch (e) {
             case EnumElement(:final instantiate):
-              _addType(
-                instantiate(
-                  typeArguments: const [],
-                  nullabilitySuffix: NullabilitySuffix.none,
+              final type = instantiate(
+                typeArguments: const [],
+                nullabilitySuffix: NullabilitySuffix.none,
+              );
+              references.add(
+                Reference(
+                  associatedElement: type.element,
+                  lib: type.element.library,
                 ),
               );
               shouldBreak = true;
@@ -336,8 +488,9 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     }
 
     if (element
-        case ExtensionElement(:final library) || ClassElement(:final library)) {
-      _addLibrary(library);
+        case ExtensionElement(:final library) || ClassElement(:final library)
+        when element != null) {
+      references.add(Reference(lib: library, associatedElement: element));
     }
 
     super.visitPropertyAccess(node);
@@ -353,34 +506,25 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
         _ => null,
       };
 
-      if (element case final ClassElement element) {
-        _addType(element.thisType);
-      } else if (element case final EnumElement element?) {
-        _addType(
-          element.instantiate(
+      switch (element) {
+        case ClassElement(thisType: InterfaceType(:final element)):
+          references.add(
+            Reference(lib: element.library, associatedElement: element),
+          );
+        case EnumElement(:final instantiate):
+          final type = instantiate(
             typeArguments: const [],
             nullabilitySuffix: NullabilitySuffix.none,
-          ),
-        );
+          );
+
+          references.add(
+            Reference(
+              associatedElement: type.element,
+              lib: type.element.library,
+            ),
+          );
       }
     }
     super.visitComment(node);
-  }
-
-  void _addType(InterfaceType type) {
-    final library = type.element.library;
-    if (type.element.name?.startsWith('_') case true) {
-      return;
-    }
-
-    _addLibrary(library);
-  }
-
-  void _addLibrary(LibraryElement library) {
-    if (library.isDartCore) {
-      return;
-    }
-
-    libraries.add(library);
   }
 }
