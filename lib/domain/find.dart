@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:file/file.dart';
 import 'package:glob/glob.dart';
-import 'package:import_cleaner/deps/fs.dart';
-import 'package:import_cleaner/deps/platform.dart';
-import 'package:import_cleaner/deps/process.dart';
+import 'package:import_ozempic/deps/fs.dart';
+import 'package:import_ozempic/deps/platform.dart';
+import 'package:import_ozempic/deps/process.dart';
 import 'package:platform/platform.dart';
 
 class Find {

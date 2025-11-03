@@ -1,6 +1,6 @@
 import 'dart:io' as io;
 
-import 'package:import_cleaner/domain/process_details.dart';
+import 'package:import_ozempic/domain/process_details.dart';
 import 'package:scoped_deps/scoped_deps.dart';
 
 typedef Process =

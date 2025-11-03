@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:glob/glob.dart';
-import 'package:import_cleaner/deps/fs.dart';
-import 'package:import_cleaner/deps/log.dart';
+import 'package:import_ozempic/deps/fs.dart';
+import 'package:import_ozempic/deps/log.dart';
 import 'package:yaml/yaml.dart';
 
 class Config {

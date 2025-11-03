@@ -5,6 +5,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/element/scope.dart';
+import 'package:import_ozempic/domain/reference.dart';
 
 /// Collects all external type references that would require imports.
 class ImportTypeCollector extends RecursiveAstVisitor<void> {

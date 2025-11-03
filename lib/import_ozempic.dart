@@ -1,8 +1,8 @@
-import 'package:import_cleaner/commands/fix_command.dart';
-import 'package:import_cleaner/domain/args.dart';
+import 'package:import_ozempic/commands/fix_command.dart';
+import 'package:import_ozempic/domain/args.dart';
 
-class ImportCleaner {
-  const ImportCleaner();
+class ImportOzempic {
+  const ImportOzempic();
 
   Future<int> run(Args args) async {
     switch (args.path) {

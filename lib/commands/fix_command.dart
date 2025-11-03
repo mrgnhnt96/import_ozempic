@@ -1,15 +1,16 @@
 import 'dart:io';
 
 import 'package:analyzer/dart/analysis/results.dart';
-import 'package:import_cleaner/deps/analyzer.dart';
-import 'package:import_cleaner/deps/fs.dart';
-import 'package:import_cleaner/deps/log.dart';
-import 'package:import_cleaner/domain/args.dart';
-import 'package:import_cleaner/domain/config.dart';
-import 'package:import_cleaner/domain/import_type_collector.dart';
+import 'package:import_ozempic/deps/analyzer.dart';
+import 'package:import_ozempic/deps/fs.dart';
+import 'package:import_ozempic/deps/log.dart';
+import 'package:import_ozempic/domain/args.dart';
+import 'package:import_ozempic/domain/config.dart';
+import 'package:import_ozempic/domain/import_type_collector.dart';
+import 'package:import_ozempic/domain/reference.dart';
 
 const _usage = '''
-Usage: import_cleaner fix <file>...
+Usage: import_ozempic fix <file>...
 
 Fixes the imports in the given files.
 ''';
