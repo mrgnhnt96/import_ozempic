@@ -1,5 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:import_ozempic/commands/fix_command.dart';
+import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
 
 mixin SharedReference {

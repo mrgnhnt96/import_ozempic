@@ -15,12 +15,7 @@ void main(List<String> arguments) async {
   Directory.current =
       '/Users/morgan/Documents/develop.nosync/couchsurfing/pillows/apps/mobile';
 
-  run([
-    'fix',
-    'packages/ui/lib/widgets/slivers/flexible_space_bar.dart',
-    '--config',
-    'import_ozempic.yaml',
-  ]);
+  run(['fix', 'packages/ui', '--config', 'import_ozempic.yaml']);
 }
 
 void run(List<String> arguments) async {

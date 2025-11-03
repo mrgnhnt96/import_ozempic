@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:import_ozempic/commands/fix_command.dart';
+import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/multi_reference.dart';
+import 'package:import_ozempic/domain/resolved_import.dart';
 import 'package:import_ozempic/domain/shared_reference.dart';
 
 class Reference with SharedReference {
