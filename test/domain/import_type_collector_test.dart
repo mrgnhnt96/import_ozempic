@@ -1,3 +1,4 @@
+import 'package:file/file.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/domain/import.dart';
@@ -13,13 +14,16 @@ void main() {
       collector = ImportTypeCollector();
     });
 
+    String cwd(FileSystem fs) =>
+        fs.directory(fs.path.joinAll(['test', 'fixtures'])).path;
+
     testScoped(
       'pattern field name',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'pattern_field_name.dart'),
+          fs.path.join(cwd(fs), 'lib', 'pattern_field_name.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -41,12 +45,40 @@ void main() {
     );
 
     testScoped(
-      'should ignore Future and Stream',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      'extension getter',
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'named_type', 'future_and_stream.dart'),
+          fs.path.join(cwd(fs), 'lib', 'bloc.dart'),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final references = collector.references;
+
+        expect(references, isNotEmpty);
+
+        final [context, contextX, bloc, blocX] = references
+            .map((e) => e.import)
+            .toList();
+
+        expect(context, Import('package:_extensions/domain/context.dart'));
+        expect(contextX, Import('package:_extensions/ext/context_x.dart'));
+        expect(bloc, Import('package:_extensions/domain/bloc.dart'));
+        expect(blocX, Import('package:_extensions/domain/bloc.dart'));
+      },
+    );
+
+    testScoped(
+      'should ignore Future and Stream',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        final results = await analyzer.analyze([
+          fs.path.join(cwd(fs), 'lib', 'named_type', 'future_and_stream.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -61,11 +93,11 @@ void main() {
 
     testScoped(
       'should resolve type aliases',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'named_type', 'type_aliases.dart'),
+          fs.path.join(cwd(fs), 'lib', 'named_type', 'type_aliases.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -87,11 +119,11 @@ void main() {
 
     testScoped(
       'should get general types',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'named_type', 'return_types.dart'),
+          fs.path.join(cwd(fs), 'lib', 'named_type', 'return_types.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -112,11 +144,11 @@ void main() {
 
     testScoped(
       'should get top level getter & setter',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'simple_identifier', 'env_globals.dart'),
+          fs.path.join(cwd(fs), 'lib', 'simple_identifier', 'env_globals.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -141,11 +173,16 @@ void main() {
 
     testScoped(
       'should get top level variable and method',
-      cwd: () => fs.directory(fs.path.joinAll(['test', 'fixtures'])).path,
+      cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join('lib', 'simple_identifier', 'math_globals.dart'),
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'simple_identifier',
+            'math_globals.dart',
+          ),
         ]);
 
         final lib = await (results.single.$2)();

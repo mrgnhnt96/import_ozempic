@@ -24,12 +24,8 @@ void testScoped(
 
   test(description, () {
     runScoped(values: testProviders, () {
-      if (cwd?.call() case final String cwd) {
-        fs.currentDirectory = cwd;
-      }
-
       if (initializeAnalyzer) {
-        analyzer.initialize(root: fs.currentDirectory.path);
+        analyzer.initialize(root: cwd?.call() ?? fs.currentDirectory.path);
       }
 
       fn();

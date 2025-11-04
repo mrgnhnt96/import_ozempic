@@ -174,6 +174,12 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
             Reference(lib: library, associatedElement: element, prefix: prefix),
           );
         }
+      case ExecutableElement(enclosingElement: final element):
+        if (element case ExtensionElement(:final library)) {
+          _addReference(
+            Reference(lib: library, associatedElement: element, prefix: prefix),
+          );
+        }
     }
 
     super.visitSimpleIdentifier(node);
