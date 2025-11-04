@@ -44,6 +44,12 @@ Give a single file a quick checkup:
 import_ozempic fix lib/main.dart
 ```
 
+if you installed it as a dependency, you can run it with
+
+```bash
+dart run import_ozempic fix lib/main.dart
+```
+
 Or use the shorter `ioz` alias (because who has time for long commands?):
 
 ```bash
