@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/fs.dart';
@@ -51,14 +53,16 @@ class FixCommand {
       'unused_shown_name',
     ]);
 
-    if (result.exitCode != 0) {
+    if (await result.exitCode != 0) {
       log('Failed to fix analysis errors in files');
       log(result.stderr);
       return result.exitCode;
     }
 
     log('Analysis errors fixed in files');
-    log(result.stdout);
+    await for (final line in result.stdout.transform(utf8.decoder)) {
+      log(line);
+    }
 
     return 0;
   }
