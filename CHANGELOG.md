@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.0.8 | 11.4.25
+
+- Add `--version` flag to print the version of the package
+- Add check for new versions of the package
+
 ## 0.0.7 | 11.4.25
 
 - Add `update` command to update the package to the latest version
