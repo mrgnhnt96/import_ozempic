@@ -10,9 +10,9 @@ import 'package:import_ozempic/domain/resolved_references.dart';
 import 'package:meta/meta.dart';
 
 const _usage = '''
-Usage: import_ozempic fix <file>...
+Usage: import_ozempic fix <files...>
 
-Fixes the imports in the given files.
+Formats and fixes import statements in the specified Dart file(s), removing unused imports and normalizing import order and style.
 ''';
 
 class FixCommand {
@@ -21,6 +21,11 @@ class FixCommand {
   final Args args;
 
   Future<int> run(List<String> files) async {
+    if (args['help'] case true) {
+      log(_usage);
+      return 0;
+    }
+
     if (files.isEmpty) {
       log('No files were provided');
       log(_usage);
