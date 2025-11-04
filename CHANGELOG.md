@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.0.3 | 11.4.25
+## 0.0.4 | 11.4.25
 
 - Update README
 
