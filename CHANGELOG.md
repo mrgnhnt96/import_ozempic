@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.7 | 11.4.25
+
+- Add `update` command to update the package to the latest version
+
 ## 0.0.6 | 11.4.25
 
 - Add `help` flag to commands

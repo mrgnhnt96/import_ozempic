@@ -1,5 +1,5 @@
 name: import_ozempic
-version: 0.0.6
+version: 0.0.7
 description: A Dart command-line tool that automatically organizes and cleans up imports in your Dart projects.
 repository: https://github.com/mrgnhnt96/import_ozempic
 
