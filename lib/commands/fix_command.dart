@@ -12,7 +12,7 @@ import 'package:import_ozempic/domain/resolved_references.dart';
 import 'package:meta/meta.dart';
 
 const _usage = '''
-Usage: import_ozempic fix <files...>
+Usage: import_ozempic fix <files...> [--config <path>]
 
 Formats and fixes import statements in the specified Dart file(s), removing unused imports and normalizing import order and style.
 ''';
@@ -21,6 +21,12 @@ class FixCommand {
   const FixCommand({required this.args});
 
   final Args args;
+
+  Config get config =>
+      switch (args.getOrNull('config') ?? args.getOrNull('c')) {
+        final String path => Config.load(path),
+        _ => Config(),
+      };
 
   Future<int> run(List<String> files) async {
     if (args['help'] case true) {
@@ -39,6 +45,41 @@ class FixCommand {
     }
 
     log('');
+    if (await _fixAnalysisErrors(files) case final int exitCode) {
+      return exitCode;
+    }
+
+    if (config.format) {
+      log('');
+      if (await _format(files) case final int exitCode) {
+        return exitCode;
+      }
+    }
+
+    return 0;
+  }
+
+  Future<int?> _format(List<String> files) async {
+    log('Formatting files');
+
+    final result = await process('dart', ['format', ...files]);
+
+    if (await result.exitCode != 0) {
+      log('Failed to format files');
+      await for (final line in result.stderr.transform(utf8.decoder)) {
+        log(line);
+      }
+      return result.exitCode;
+    }
+
+    await for (final line in result.stdout.transform(utf8.decoder)) {
+      log(line);
+    }
+
+    return null;
+  }
+
+  Future<int?> _fixAnalysisErrors(List<String> files) async {
     log('Fixing unused imports in files');
 
     final result = await process('dart', [
@@ -55,7 +96,9 @@ class FixCommand {
 
     if (await result.exitCode != 0) {
       log('Failed to fix analysis errors in files');
-      log(result.stderr);
+      await for (final line in result.stderr.transform(utf8.decoder)) {
+        log(line);
+      }
       return result.exitCode;
     }
 
@@ -64,7 +107,7 @@ class FixCommand {
       log(line);
     }
 
-    return 0;
+    return null;
   }
 
   Future<int?> _fixImports(List<String> files) async {
@@ -186,17 +229,17 @@ class FixCommand {
       final lines => lines.join('\n'),
     };
 
-    final (:dart, :relative, :package) = imports;
+    final (:dart, :relative, :package) = imports(
+      trailComments: !_config.format,
+    );
 
     final importStatements = [
-      if (dart.isNotEmpty) ...dart.followedBy(['']),
-      if (package.isNotEmpty) ...package.followedBy(['']),
-      if (relative.isNotEmpty) ...relative.followedBy(['']),
+      if (dart.isNotEmpty) ...dart.map((e) => '$e').followedBy(['']),
+      if (package.isNotEmpty) ...package.map((e) => '$e').followedBy(['']),
+      if (relative.isNotEmpty) ...relative.map((e) => '$e').followedBy(['']),
     ];
 
-    if (_config case Config(
-      formatImports: false,
-    ) when importStatements.isNotEmpty) {
+    if (_config case Config(format: false) when importStatements.isNotEmpty) {
       importStatements.insert(0, '// dart format off');
       // leave the last line empty
       importStatements.insert(importStatements.length - 1, '// dart format on');

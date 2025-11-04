@@ -1,5 +1,6 @@
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
+import 'package:import_ozempic/domain/resolved_import.dart';
 
 class ResolvedReferences {
   ResolvedReferences({
@@ -15,8 +16,12 @@ class ResolvedReferences {
 
   bool get hasImports => references.isNotEmpty;
 
-  ({List<String> dart, List<String> relative, List<String> package})
-  get imports {
+  ({
+    List<ResolvedImport> dart,
+    List<ResolvedImport> relative,
+    List<ResolvedImport> package,
+  })
+  imports({bool trailComments = true}) {
     final path = this.path;
 
     if (path == null) {
@@ -58,21 +63,34 @@ class ResolvedReferences {
       imports[key] = ref;
     }
 
-    final dart = <String>{};
-    final relative = <String>{};
-    final package = <String>{};
+    final dart = <ResolvedImport>{};
+    final relative = <ResolvedImport>{};
+    final package = <ResolvedImport>{};
 
     for (final ref in imports.values) {
-      final resolved = ref.importStatement(path);
+      final resolved = ref.importStatement(
+        path,
+        includeIgnores: !trailComments,
+      );
       if (resolved == null) continue;
+
+      void addTo(Set<ResolvedImport> set) {
+        set.add(
+          ResolvedImport(
+            import: resolved,
+            trailComments: trailComments,
+            ignoreComments: ref.ignores,
+          ),
+        );
+      }
 
       switch (ref.import) {
         case Import(isDart: true):
-          dart.add(resolved);
+          addTo(dart);
         case Import(isRelative: true):
-          relative.add(resolved);
+          addTo(relative);
         case Import(isPackage: true):
-          package.add(resolved);
+          addTo(package);
       }
     }
 

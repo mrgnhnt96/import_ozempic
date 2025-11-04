@@ -20,15 +20,36 @@ mixin SharedReference {
     return null;
   }
 
-  String? get showCombinator {
-    if (associatedElement case Element(:final displayName)) {
+  String? showCombinator({bool includeIgnores = false}) {
+    if (associatedElement case Element(
+      :final displayName,
+      metadata: Metadata(:final annotations),
+    )) {
+      final ignores = <String>{};
+      if (includeIgnores) {
+        for (final annotation in annotations) {
+          if (annotation.isDeprecated) {
+            ignores.add('deprecated_member_use');
+          }
+        }
+      }
+
+      if (ignores.isNotEmpty) {
+        return [
+          'show',
+          '// ignore: ${ignores.join(', ')}',
+          '$displayName',
+        ].join('\n');
+      }
+
       return 'show $displayName';
     }
 
     return null;
   }
 
-  String? importStatement(String path) {
+  /// [includeIgnores] will add any ignore comments to above any `show` combinator
+  String? importStatement(String path, {bool includeIgnores = false}) {
     if (optional) {
       return null;
     }
@@ -43,11 +64,15 @@ mixin SharedReference {
       "'$import'",
       // if (hideCombinator case final String combinator) combinator,
       if (prefix case final String prefix) 'as $prefix',
-      if (showCombinator case final String combinator) combinator,
+      if (showCombinator(includeIgnores: includeIgnores)
+          case final String combinator)
+        combinator,
     ].join(' ').trim();
 
     return '$statement;';
   }
+
+  List<String>? get ignores;
 
   bool canJoin(Reference other) {
     // prefixes cannot be joined if they are:

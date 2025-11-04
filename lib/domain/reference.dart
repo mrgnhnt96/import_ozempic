@@ -65,4 +65,20 @@ class Reference with SharedReference {
 
     return MultiReference(references: [this, ref]);
   }
+
+  @override
+  List<String>? get ignores {
+    final element = associatedElement;
+    if (element case null) return null;
+
+    final ignores = <String>{};
+
+    if (element.metadata.annotations.any(
+      (annotation) => annotation.isDeprecated,
+    )) {
+      ignores.add('deprecated_member_use');
+    }
+
+    return ignores.toList();
+  }
 }

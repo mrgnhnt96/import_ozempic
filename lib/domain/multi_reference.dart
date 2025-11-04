@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'package:import_ozempic/domain/combinator.dart';
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
 import 'package:import_ozempic/domain/resolved_references.dart';
@@ -42,13 +43,30 @@ class MultiReference with SharedReference implements Reference {
     return 'hide $joined';
   }
 
+  Combinator? _showCombinator(Reference ref, {bool includeIgnores = false}) {
+    final combinator = ref.showCombinator(includeIgnores: includeIgnores);
+    if (combinator == null) return null;
+
+    final parts = combinator.split('\n');
+    if (parts case [final show]) {
+      return Combinator(
+        ignore: null,
+        show: show.replaceFirst(RegExp(r'^show\s+'), '').trim(),
+      );
+    }
+
+    final [ignore, show] = parts;
+
+    return Combinator(ignore: ignore, show: show.replaceAll('show', '').trim());
+  }
+
   @override
-  String? get showCombinator {
+  String? showCombinator({bool includeIgnores = false}) {
     final names = {
       for (final ref in references)
-        if (ref case Reference(associatedElement: Element(:final displayName)))
-          if (displayName.trim() case final String name when name.isNotEmpty)
-            name,
+        if (_showCombinator(ref, includeIgnores: includeIgnores)
+            case final Combinator combinator)
+          combinator,
     };
 
     if (names.isEmpty) return null;
@@ -128,7 +146,8 @@ class MultiReference with SharedReference implements Reference {
           associatedElement == other.associatedElement &&
           prefix == other.prefix &&
           optional == other.optional &&
-          hide == other.hide;
+          hide == other.hide &&
+          ignores == other.ignores;
 
   @override
   String toString() {
@@ -137,5 +156,23 @@ class MultiReference with SharedReference implements Reference {
     }
 
     return '~~$import~~';
+  }
+
+  @override
+  List<String>? get ignores {
+    final ignores = <String>{};
+
+    for (final ref in references) {
+      final element = ref.associatedElement;
+      if (element case null) continue;
+
+      if (element.metadata.annotations.any(
+        (annotation) => annotation.isDeprecated,
+      )) {
+        ignores.add('deprecated_member_use');
+      }
+    }
+
+    return ignores.toList();
   }
 }

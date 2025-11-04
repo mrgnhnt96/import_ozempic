@@ -146,7 +146,7 @@ void main() {}
 
           command.updateImportStatements(
             reference,
-            config: Config(formatImports: true),
+            config: Config(format: true),
           );
 
           final content = memoryFs.file(path).readAsStringSync();
@@ -192,7 +192,7 @@ void main() {}
 
           command.updateImportStatements(
             reference,
-            config: Config(formatImports: true),
+            config: Config(format: true),
           );
 
           final content = memoryFs.file(path).readAsStringSync();
