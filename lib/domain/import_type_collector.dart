@@ -56,96 +56,17 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   }
 
   @override
-  void visitImportDirective(ImportDirective node) {
-    final names = <(NodeList<SimpleIdentifier>, {bool hide})>[];
-    for (final combination in node.combinators) {
-      switch (combination) {
-        case HideCombinator(:final hiddenNames):
-          names.add((hiddenNames, hide: true));
-        case ShowCombinator(:final shownNames):
-          names.add((shownNames, hide: false));
-      }
-    }
-
-    for (final (hiddenNames, :hide) in names) {
-      for (final name in hiddenNames) {
-        switch (name.element) {
-          case ClassElement(:final thisType, :final library):
-            _addReference(
-              Reference.optional(
-                lib: library,
-                associatedElement: thisType.element,
-                hide: hide,
-              ),
-            );
-          case EnumElement(:final instantiate, :final library):
-            _addReference(
-              Reference.optional(
-                lib: library,
-                associatedElement: instantiate(
-                  typeArguments: const [],
-                  nullabilitySuffix: NullabilitySuffix.none,
-                ).element,
-                hide: hide,
-              ),
-            );
-          case TypeAliasElement(:final instantiate, :final library):
-            _addReference(
-              Reference.optional(
-                lib: library,
-                associatedElement: instantiate(
-                  typeArguments: const [],
-                  nullabilitySuffix: NullabilitySuffix.none,
-                ).element,
-                hide: hide,
-              ),
-            );
-          case MethodElement(:final ExtensionElement enclosingElement):
-            if (enclosingElement case Element(:final library?)) {
-              _addReference(
-                Reference.optional(
-                  associatedElement: enclosingElement,
-                  lib: library,
-                  hide: hide,
-                ),
-              );
-            }
-          case FieldElement(:final enclosingElement, isStatic: true):
-            if (enclosingElement case Element(:final library?)) {
-              _addReference(
-                Reference.optional(
-                  associatedElement: enclosingElement,
-                  lib: library,
-                  hide: hide,
-                ),
-              );
-            }
-
-          case ConstructorElement(:final library):
-          case TopLevelVariableElement(:final library):
-          case TopLevelFunctionElement(:final library):
-          case Element(:final library?):
-            _addReference(
-              Reference.optional(
-                associatedElement: name.element,
-                lib: library,
-                hide: hide,
-              ),
-            );
-          default:
-            break;
-        }
-      }
-    }
-
-    super.visitImportDirective(node);
-  }
-
-  @override
   void visitNamedType(NamedType node) {
     switch (node) {
       case NamedType(name: Token(lexeme: 'Future' || 'Stream')):
         break;
+
+      /// Example: `VoidCallback`
+      case NamedType(:final TypeAliasElement element):
+        _addReference(
+          Reference(lib: element.library, associatedElement: element),
+        );
+
       // Example: `Foo`, `List<Bar>`
       case NamedType(
         :final InterfaceType type,
@@ -172,33 +93,9 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
             }
           }
         }
-
-      /// Example: `VoidCallback`
-      case NamedType(:final TypeAliasElement element):
-        _addReference(
-          Reference(lib: element.library, associatedElement: element),
-        );
     }
 
     super.visitNamedType(node);
-  }
-
-  @override
-  void visitImportPrefixReference(ImportPrefixReference node) {
-    if (node case ImportPrefixReference(
-      :final PrefixElement element,
-      parent: NamedType(element: Element(:final library?)),
-    )) {
-      _addReference(
-        Reference.optional(
-          lib: library,
-          associatedElement: element,
-          prefix: element.displayName,
-        ),
-      );
-    }
-
-    super.visitImportPrefixReference(node);
   }
 
   @override
@@ -223,11 +120,26 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
       switch (node) {
         case SimpleIdentifierImpl(
           scopeLookupResult: PrefixScopeLookupResult(
-                getter: ExecutableElement(:final baseElement),
-              ) ||
-              PrefixScopeLookupResult(
-                setter: ExecutableElement(:final baseElement),
+            setter: ExecutableElement(:final baseElement),
+          ),
+          parent: AssignmentExpression(),
+        ):
+          if (baseElement case SetterElement(
+            :final library,
+            variable: TopLevelVariableElement(),
+          )) {
+            _addReference(
+              Reference(
+                lib: library,
+                associatedElement: baseElement,
+                prefix: prefix,
               ),
+            );
+          }
+        case SimpleIdentifierImpl(
+          scopeLookupResult: PrefixScopeLookupResult(
+            getter: ExecutableElement(:final baseElement),
+          ),
         ):
           if (baseElement case PropertyAccessorElement(
             :final library,
