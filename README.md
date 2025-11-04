@@ -103,14 +103,14 @@ exclude:
   - "test/fixtures/**"
 ```
 
-### `format_imports`
+### `format`
 
 A boolean flag to control import formatting. When `false` (default), each import statement remains on a single line. When `true`, imports are formatted according to Dart's style guide—for when you want that extra polish!
 
 **Example:**
 
 ```yaml
-format_imports: true
+format: true
 exclude:
   - "**/*.g.dart"
 ```
