@@ -1,8 +1,8 @@
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
 
-class ResolvedImport {
-  ResolvedImport() : parts = {}, references = {};
+class ResolvedReferences {
+  ResolvedReferences() : parts = {}, references = {};
 
   String? path;
   final Set<String> parts;

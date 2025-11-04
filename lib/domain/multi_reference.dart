@@ -1,7 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
-import 'package:import_ozempic/domain/resolved_import.dart';
+import 'package:import_ozempic/domain/resolved_references.dart';
 import 'package:import_ozempic/domain/shared_reference.dart';
 
 class MultiReference with SharedReference implements Reference {
@@ -13,7 +13,7 @@ class MultiReference with SharedReference implements Reference {
   Element? get associatedElement => null;
 
   @override
-  bool canInclude(ResolvedImport import) {
+  bool canInclude(ResolvedReferences import) {
     return references.any((ref) => ref.canInclude(import));
   }
 
@@ -21,8 +21,6 @@ class MultiReference with SharedReference implements Reference {
   bool get hide => references.any((ref) => ref.hide);
 
   @override
-  bool get show => references.any((ref) => ref.show);
-
   String? get hideCombinator {
     if (!hide) return null;
 
@@ -32,29 +30,33 @@ class MultiReference with SharedReference implements Reference {
           hide: true,
           associatedElement: Element(:final displayName),
         ))
-          displayName,
-    }.join(', ');
+          if (displayName.trim() case final String name when name.isNotEmpty)
+            name,
+    };
 
     if (names.isEmpty) return null;
 
-    return 'hide $names';
+    final sorted = names.toList()..sort();
+    final joined = sorted.join(', ');
+
+    return 'hide $joined';
   }
 
+  @override
   String? get showCombinator {
-    if (!show) return null;
-
     final names = {
       for (final ref in references)
-        if (ref case Reference(
-          show: true,
-          associatedElement: Element(:final displayName),
-        ))
-          displayName,
-    }.join(', ');
+        if (ref case Reference(associatedElement: Element(:final displayName)))
+          if (displayName.trim() case final String name when name.isNotEmpty)
+            name,
+    };
 
     if (names.isEmpty) return null;
 
-    return 'show $names';
+    final sorted = names.toList()..sort();
+    final joined = sorted.join(', ');
+
+    return 'show $joined';
   }
 
   @override
@@ -99,23 +101,19 @@ class MultiReference with SharedReference implements Reference {
 
   @override
   String? get prefix {
-    if (references.every((ref) => ref.prefix == null)) {
-      return null;
+    String? p;
+
+    for (final Reference(:prefix) in references) {
+      if (prefix == null) continue;
+
+      p ??= prefix;
+
+      if (p != prefix) {
+        throw Exception('MultiReference cannot have multiple prefixes');
+      }
     }
 
-    final prefix = references.firstWhere((r) => r.prefix != null).prefix;
-
-    if (references.every(
-      (ref) => switch (ref.prefix) {
-        null => true,
-        final p when p == prefix => true,
-        _ => false,
-      },
-    )) {
-      return prefix;
-    }
-
-    throw Exception('MultiReference cannot have multiple prefixes');
+    return p;
   }
 
   @override
@@ -134,11 +132,10 @@ class MultiReference with SharedReference implements Reference {
 
   @override
   String toString() {
-    return [
-      if (hide)
-        if (optional) '(hide?)' else '(hide)',
-      '${lib.uri.toString()}',
-      if (prefix case final String prefix) 'as $prefix',
-    ].join(', ');
+    if (importStatement('') case final String import) {
+      return import;
+    }
+
+    return '~~$import~~';
   }
 }

@@ -1,13 +1,12 @@
-import 'dart:io';
-
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/deps/log.dart';
+import 'package:import_ozempic/deps/process.dart';
 import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/domain/config.dart';
 import 'package:import_ozempic/domain/import_type_collector.dart';
-import 'package:import_ozempic/domain/resolved_import.dart';
+import 'package:import_ozempic/domain/resolved_references.dart';
 
 const _usage = '''
 Usage: import_ozempic fix <file>...
@@ -34,7 +33,7 @@ class FixCommand {
     log('');
     log('Fixing unused imports in files');
 
-    final result = await Process.run('dart', [
+    final result = await process('dart', [
       'fix',
       ...files,
       '--apply',
@@ -42,6 +41,8 @@ class FixCommand {
       'unused_import',
       '--code',
       'unnecessary_import',
+      '--code',
+      'unused_shown_name',
     ]);
 
     if (result.exitCode != 0) {
@@ -99,91 +100,87 @@ class FixCommand {
       return 0;
     }
 
-    final futures = <Future<ResolvedImport>>[];
-
     log('Resolving imports:');
     for (final lib in libraries) {
-      futures.add(_resolveImport(lib));
-    }
-
-    final resolvedImports = await Future.wait(futures);
-
-    for (final import in resolvedImports) {
-      final ResolvedImport(:path, :imports, :hasImports) = import;
-
-      if (path == null) continue;
-      if (!hasImports) continue;
-
-      final lines = fs.file(path).readAsLinesSync();
-
-      int? importStart;
-      int? importEnd;
-      int? commentStart;
-
-      const skippable = ['as', 'hide', 'show', 'export'];
-
-      for (final (index, line) in lines.indexed) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        if (trimmed.startsWith('//')) {
-          commentStart ??= index;
-          continue;
-        }
-
-        if (skippable.any(trimmed.startsWith)) {
-          continue;
-        }
-
-        if (trimmed.startsWith('import ')) {
-          importStart ??= index;
-          commentStart = null;
-          continue;
-        }
-
-        importEnd = commentStart ?? index;
-        break;
-      }
-
-      if (importStart == null) {
-        if (importEnd != null) {
-          importStart = importEnd;
-        } else {
-          log('No import start found for ${fs.path.relative(path)}');
-          continue;
-        }
-      }
-
-      if (importEnd == null) {
-        log('No import end found for ${fs.path.relative(path)}');
-        continue;
-      }
-
-      final contentStart = lines.take(importStart).join('\n');
-      final contentEnd = lines.sublist(importEnd).join('\n');
-
-      final (:dart, :relative, :package) = imports;
-
-      var content = [
-        if (contentStart.trim() case final String start when start.isNotEmpty)
-          start,
-        if (dart.isNotEmpty) ...dart.followedBy(['']),
-        if (package.isNotEmpty) ...package.followedBy(['']),
-        if (relative.isNotEmpty) ...relative.followedBy(['']),
-        contentEnd.trim(),
-        '',
-      ].join('\n');
-
-      fs.file(path).writeAsStringSync(content.trimLeft());
+      await _updateImportStatements(await _resolveReferences(lib));
     }
 
     return null;
   }
 
-  Future<ResolvedImport> _resolveImport(
+  Future<void> _updateImportStatements(ResolvedReferences import) async {
+    final ResolvedReferences(:path, :imports, :hasImports) = import;
+
+    if (path == null) return;
+    if (!hasImports) return;
+
+    final lines = fs.file(path).readAsLinesSync();
+
+    int? importStart;
+    int? importEnd;
+    int? commentStart;
+
+    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\s+\w*[,;]$')];
+
+    for (final (index, line) in lines.indexed) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      if (trimmed.startsWith('//')) {
+        commentStart ??= index;
+        continue;
+      }
+
+      if (skippable.any(trimmed.startsWith)) {
+        continue;
+      }
+
+      if (trimmed.startsWith('import ')) {
+        importStart ??= index;
+        commentStart = null;
+        continue;
+      }
+
+      importEnd = commentStart ?? index;
+      break;
+    }
+
+    if (importStart == null) {
+      if (importEnd != null) {
+        importStart = importEnd;
+      } else {
+        log('No import start found for ${fs.path.relative(path)}');
+        return;
+      }
+    }
+
+    if (importEnd == null) {
+      log('No import end found for ${fs.path.relative(path)}');
+      return;
+    }
+
+    final contentStart = lines.take(importStart).join('\n');
+    final contentEnd = lines.sublist(importEnd).join('\n');
+
+    final (:dart, :relative, :package) = imports;
+
+    var content = [
+      if (contentStart.trim() case final String start when start.isNotEmpty)
+        start,
+      if (dart.isNotEmpty) ...dart.followedBy(['']),
+      if (package.isNotEmpty) ...package.followedBy(['']),
+      if (relative.isNotEmpty) ...relative.followedBy(['']),
+      contentEnd.trim(),
+      '',
+    ].join('\n');
+
+    fs.file(path).writeAsStringSync(content.trimLeft());
+  }
+
+  Future<ResolvedReferences> _resolveReferences(
     (ParsedUnitResult, Future<ResolvedUnitResult> Function()) lib,
   ) async {
     final collector = ImportTypeCollector();
-    final resolvedImport = ResolvedImport();
+    final resolvedImport = ResolvedReferences();
 
     final (parsed, resolved) = lib;
 

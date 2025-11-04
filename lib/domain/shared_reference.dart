@@ -8,7 +8,6 @@ mixin SharedReference {
   bool get optional;
   Element? get associatedElement;
   bool get hide;
-  bool get show;
   Import get import;
 
   String? get hideCombinator {
@@ -22,8 +21,6 @@ mixin SharedReference {
   }
 
   String? get showCombinator {
-    if (!show) return null;
-
     if (associatedElement case Element(:final displayName)) {
       return 'show $displayName';
     }
@@ -44,9 +41,9 @@ mixin SharedReference {
     final statement = [
       'import',
       "'$import'",
-      if (hideCombinator case final String combinator) combinator,
-      if (showCombinator case final String combinator) combinator,
+      // if (hideCombinator case final String combinator) combinator,
       if (prefix case final String prefix) 'as $prefix',
+      if (showCombinator case final String combinator) combinator,
     ].join(' ').trim();
 
     return '$statement;';
@@ -56,7 +53,7 @@ mixin SharedReference {
     // prefixes cannot be joined if they are:
     // - different
     // - one is null and the other is not
-    final canMergePrefix = switch ((prefix, other.prefix)) {
+    return switch ((prefix, other.prefix)) {
       (null, null) => true,
       (null, String()) || (String(), null) => switch ((
         associatedElement,
@@ -68,22 +65,6 @@ mixin SharedReference {
       },
       (final String p1, final String p2) => p1 == p2,
     };
-
-    if (!canMergePrefix) {
-      return false;
-    }
-
-    final canMergeShow = switch ((show, other.show)) {
-      (true, true) => true,
-      (false, false) => true,
-      _ => false,
-    };
-
-    if (!canMergeShow) {
-      return false;
-    }
-
-    return true;
   }
 
   @override
