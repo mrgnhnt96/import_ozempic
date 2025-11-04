@@ -38,6 +38,12 @@ Fix imports in a single file:
 import_ozempic fix lib/main.dart
 ```
 
+Or use the shorter `ioz` alias:
+
+```bash
+ioz fix lib/main.dart
+```
+
 Fix imports in multiple files:
 
 ```bash
