@@ -11,11 +11,7 @@ import 'package:import_ozempic/import_ozempic.dart';
 import 'package:scoped_deps/scoped_deps.dart';
 
 void main(List<String> arguments) async {
-  // run(arguments);
-  Directory.current =
-      '/Users/morgan/Documents/develop.nosync/couchsurfing/pillows/apps/mobile';
-
-  run(['fix', '.', '--config', 'import_cleaner.yaml']);
+  run(arguments);
 }
 
 void run(List<String> arguments) async {
