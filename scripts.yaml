@@ -27,8 +27,8 @@ publish:
     version=$(grep -m 1 "## " CHANGELOG.md | awk '{print $2}')
 
     echo "Committing version $version"
-    git add .
-    git commit -m "v$version"
+    git add . || true
+    git commit -m "v$version" --allow-empty
   tag: |
     # get version from changelog
     version=$(grep -m 1 "## " CHANGELOG.md | awk '{print $2}')
