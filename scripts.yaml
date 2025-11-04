@@ -1,0 +1,6 @@
+install:
+  - dart pub global deactivate lint_kit_cli || true
+  - rm -rf .dart_tool
+  - rm pubspec.lock
+  - dart pub get
+  - dart pub global activate --source path . --overwrite
