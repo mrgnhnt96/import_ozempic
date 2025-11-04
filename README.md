@@ -166,24 +166,18 @@ Notice how we've eliminated the unnecessary bloat and only import exactly what y
 
 ## Development
 
+We use [sip_cli](https://pub.dev/packages/sip_cli) to manage project scripts. The scripts are defined in the `scripts.yaml` file.
+
 ### Running Tests
 
 ```bash
-dart test
+sip test
 ```
 
-### Project Structure
+### Installing Locally
 
-```text
-lib/
-├── commands/           # Command implementations
-│   └── fix_command.dart
-├── deps/              # Dependency interfaces for testability
-├── domain/            # Core business logic
-│   ├── import_type_collector.dart
-│   ├── resolved_references.dart
-│   └── ...
-└── import_ozempic.dart
+```bash
+sip run install
 ```
 
 ## License
