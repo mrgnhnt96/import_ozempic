@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.9 | 11.4.25
+
+- Fix bug where the stdout was not being logged
+
 ## 0.0.8 | 11.4.25
 
 - Add `--version` flag to print the version of the package
