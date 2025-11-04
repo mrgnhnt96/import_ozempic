@@ -1,5 +1,6 @@
 import 'dart:io' as io;
 
+import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/domain/process_details.dart';
 import 'package:scoped_deps/scoped_deps.dart';
 
@@ -27,7 +28,7 @@ final processProvider = create<Process>(() {
     final process = await io.Process.start(
       executable,
       arguments,
-      workingDirectory: workingDirectory,
+      workingDirectory: workingDirectory ?? fs.currentDirectory.path,
       environment: environment,
       includeParentEnvironment: includeParentEnvironment,
       runInShell: runInShell,
