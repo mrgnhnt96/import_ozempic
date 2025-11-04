@@ -26,27 +26,31 @@ class ResolvedReferences {
         continue;
       }
 
-      if (imports.remove(import) case final Reference existing) {
-        if (existing.canJoin(ref)) {
-          imports[import] = existing.join(ref);
-        } else {
-          final key = '$import (${ref.prefix})';
+      final key = switch (ref) {
+        Reference(prefix: null) => import,
+        Reference(:final String prefix) => '$import as $prefix',
+      };
 
-          if (imports.remove(key) case final Reference existing) {
-            if (existing.canJoin(ref)) {
-              imports[key] = existing.join(ref);
-            } else {
-              throw Exception('Unexpected duplicate import: $key');
-            }
-            continue;
+      if (imports.remove(key) case final Reference existing) {
+        if (existing.canJoin(ref)) {
+          imports[key] = existing.join(ref);
+        } else {
+          final existingKey = switch (existing) {
+            Reference(prefix: null) => import,
+            Reference(:final String prefix) => '$import as $prefix',
+          };
+
+          if (existingKey == key) {
+            throw Exception('Unexpected duplicate import: $key');
           }
 
+          imports[existingKey] = existing;
           imports[key] = ref;
         }
         continue;
       }
 
-      imports[import] = ref;
+      imports[key] = ref;
     }
 
     final dart = <String>{};

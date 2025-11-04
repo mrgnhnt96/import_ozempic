@@ -216,5 +216,52 @@ void main() {
         expect(mathMax.prefix, 'math');
       },
     );
+
+    testScoped(
+      'should get type extensions',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        final results = await analyzer.analyze([
+          fs.path.join(cwd(fs), 'lib', 'bloc_extension_type.dart'),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final references = collector.references;
+
+        final [..., extensionType] = references.toList();
+
+        expect(
+          extensionType.import,
+          Import('package:_extensions/domain/handle_type_arg.dart'),
+        );
+        expect(extensionType.prefix, isNull);
+      },
+    );
+
+    testScoped(
+      'should handle type declarations',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        final results = await analyzer.analyze([
+          fs.path.join(cwd(fs), 'lib', 'declaration.dart'),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final references = collector.references;
+
+        final [user] = references.toList();
+
+        expect(user.import, Import('package:_extensions/domain/user.dart'));
+        expect(user.prefix, '_user');
+      },
+    );
   });
 }
