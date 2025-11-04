@@ -2,7 +2,12 @@ import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/reference.dart';
 
 class ResolvedReferences {
-  ResolvedReferences() : parts = {}, references = {};
+  ResolvedReferences({
+    this.path,
+    List<String>? parts,
+    List<Reference>? references,
+  }) : parts = {...?parts},
+       references = {...?references};
 
   String? path;
   final Set<String> parts;

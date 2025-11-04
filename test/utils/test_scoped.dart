@@ -1,3 +1,4 @@
+import 'package:file/file.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/find.dart';
 import 'package:import_ozempic/deps/fs.dart';
@@ -11,18 +12,22 @@ import 'package:test/test.dart';
 void testScoped(
   String description,
   void Function() fn, {
+  FileSystem Function()? fileSystem,
   String Function()? cwd,
   bool initializeAnalyzer = false,
 }) {
-  final testProviders = {
-    analyzerProvider,
-    fsProvider,
-    findProvider,
-    logProvider,
-    platformProvider,
-  };
-
   test(description, () {
+    final testProviders = {
+      analyzerProvider,
+      if (fileSystem?.call() case final FileSystem fs)
+        fsProvider.overrideWith(() => fs)
+      else
+        fsProvider,
+      findProvider,
+      logProvider,
+      platformProvider,
+    };
+
     runScoped(values: testProviders, () {
       if (initializeAnalyzer) {
         analyzer.initialize(root: cwd?.call() ?? fs.currentDirectory.path);

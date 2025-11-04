@@ -7,6 +7,7 @@ import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/domain/config.dart';
 import 'package:import_ozempic/domain/import_type_collector.dart';
 import 'package:import_ozempic/domain/resolved_references.dart';
+import 'package:meta/meta.dart';
 
 const _usage = '''
 Usage: import_ozempic fix <file>...
@@ -102,13 +103,21 @@ class FixCommand {
 
     log('Resolving imports:');
     for (final lib in libraries) {
-      await _updateImportStatements(await _resolveReferences(lib));
+      await updateImportStatements(
+        await _resolveReferences(lib),
+        config: config,
+      );
     }
 
     return null;
   }
 
-  Future<void> _updateImportStatements(ResolvedReferences import) async {
+  @visibleForTesting
+  Future<void> updateImportStatements(
+    ResolvedReferences import, {
+    Config? config,
+  }) async {
+    final _config = config ?? Config();
     final ResolvedReferences(:path, :imports, :hasImports) = import;
 
     if (path == null) return;
@@ -120,7 +129,7 @@ class FixCommand {
     int? importEnd;
     int? commentStart;
 
-    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\w*[,;]$')];
+    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\w+[,;]$')];
 
     for (final (index, line) in lines.indexed) {
       final trimmed = line.trim();
@@ -135,6 +144,10 @@ class FixCommand {
       }
 
       if (trimmed.startsWith('import ')) {
+        if (index > 0 && lines[index - 1].startsWith('// dart format off')) {
+          importStart ??= index - 1;
+        }
+
         importStart ??= index;
         commentStart = null;
         continue;
@@ -159,16 +172,31 @@ class FixCommand {
     }
 
     final contentStart = lines.take(importStart).join('\n');
-    final contentEnd = lines.sublist(importEnd).join('\n');
+    final contentEnd = switch (lines.sublist(importEnd)) {
+      ['// dart format on', ...final lines] => lines.join('\n'),
+      final lines => lines.join('\n'),
+    };
 
     final (:dart, :relative, :package) = imports;
+
+    final importStatements = [
+      if (dart.isNotEmpty) ...dart.followedBy(['']),
+      if (package.isNotEmpty) ...package.followedBy(['']),
+      if (relative.isNotEmpty) ...relative.followedBy(['']),
+    ];
+
+    if (_config case Config(
+      formatImports: false,
+    ) when importStatements.isNotEmpty) {
+      importStatements.insert(0, '// dart format off');
+      // leave the last line empty
+      importStatements.insert(importStatements.length - 1, '// dart format on');
+    }
 
     var content = [
       if (contentStart.trim() case final String start when start.isNotEmpty)
         start,
-      if (dart.isNotEmpty) ...dart.followedBy(['']),
-      if (package.isNotEmpty) ...package.followedBy(['']),
-      if (relative.isNotEmpty) ...relative.followedBy(['']),
+      ...importStatements,
       contentEnd.trim(),
       '',
     ].join('\n');

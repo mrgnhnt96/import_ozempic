@@ -6,7 +6,7 @@ import 'package:import_ozempic/deps/log.dart';
 import 'package:yaml/yaml.dart';
 
 class Config {
-  Config({this.exclude = const []});
+  Config({this.exclude = const [], this.formatImports = false});
 
   factory Config.load(String path) {
     final file = fs.file(path);
@@ -27,10 +27,26 @@ class Config {
       _ => [],
     };
 
-    return Config(exclude: exclude as List<String>);
+    final formatImports = switch (yaml['format_imports']) {
+      final bool v => v,
+      'true' => true,
+      'false' => false,
+      _ => false,
+    };
+
+    return Config(
+      exclude: exclude as List<String>,
+      formatImports: formatImports,
+    );
   }
 
   final List<String> exclude;
+
+  /// When `false`, the import statements will not be formatted,
+  /// leaving 1 import statement per line.
+  ///
+  /// Defaults to `false`.
+  final bool formatImports;
 
   bool shouldExclude(String path) {
     for (final exclude in exclude) {
