@@ -12,16 +12,20 @@ publish:
   (command):
     - "{$lint}"
     - sip test -rbc
-    - |
-      # Sync changelog and pubspec versions
-      version=$(grep -m 1 "## " CHANGELOG.md | awk '{print $2}')
-
-      echo "Updating pubspec.yaml version to $version"
-      sed -i '' "s|^version: .*|version: $version|g" "pubspec.yaml"
+    - "{$publish:sync-versions}"
     - dart pub publish
     - "{$publish:commit}"
     - "{$publish:tag}"
     - "{$publish:_push}"
+  sync-versions: |
+    # Sync changelog and pubspec versions
+    version=$(grep -m 1 "## " CHANGELOG.md | awk '{print $2}')
+
+    echo "Updating pubspec.yaml version to $version"
+    sed -i '' "s|^version: .*|version: $version|g" "pubspec.yaml"
+
+    echo "Updating version.dart file"
+    echo "const version = '$version';" > "lib/gen/version.dart"
   commit: |
     # get version from changelog
     version=$(grep -m 1 "## " CHANGELOG.md | awk '{print $2}')
