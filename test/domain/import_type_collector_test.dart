@@ -191,7 +191,7 @@ void main() {
 
         final references = collector.references;
 
-        final [pi, max, mathPi, mathImport, mathMax] = references.toList();
+        final [pi, max, mathPi, mathMax] = references.toList();
 
         expect(
           pi.import,
