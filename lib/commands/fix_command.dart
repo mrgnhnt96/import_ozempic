@@ -120,7 +120,7 @@ class FixCommand {
     int? importEnd;
     int? commentStart;
 
-    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\s+\w*[,;]$')];
+    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\w*[,;]$')];
 
     for (final (index, line) in lines.indexed) {
       final trimmed = line.trim();
