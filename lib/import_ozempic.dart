@@ -29,16 +29,21 @@ class ImportOzempic {
     if (args['version'] case true) {
       log(version);
     } else {
-      switch (args.path) {
-        case ['fix', ...final files]:
-          exitCode = await FixCommand(args: args).run(files);
-        case ['update']:
-          exitCode = await UpdateCommand(args: args).run();
-        case ['restore']:
-          exitCode = await RestoreCommand(args: args).run();
-        default:
-          log(_usage);
-          exitCode = 1;
+      try {
+        switch (args.path) {
+          case ['fix', ...final files]:
+            exitCode = await FixCommand(args: args).run(files);
+          case ['update']:
+            exitCode = await UpdateCommand(args: args).run();
+          case ['restore']:
+            exitCode = await RestoreCommand(args: args).run();
+          default:
+            log(_usage);
+            exitCode = 1;
+        }
+      } catch (e) {
+        log('Error running command: $e');
+        exitCode = 1;
       }
     }
 
