@@ -214,6 +214,9 @@ class _FakeElement extends Fake implements Element {
   final String _displayName;
 
   @override
+  Metadata get metadata => _FakeMetadata();
+
+  @override
   String get displayName => _displayName;
 }
 
@@ -224,4 +227,9 @@ class _FakeLibrary extends Fake implements LibraryElement {
 
   @override
   Uri get uri => Uri.parse(_uri);
+}
+
+class _FakeMetadata extends Fake implements Metadata {
+  @override
+  List<ElementAnnotation> get annotations => [];
 }
