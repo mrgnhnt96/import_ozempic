@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.0.11 | 11.4.25
+
+- Move analysis options file to a temporary location to prevent any paths from being excluded from analysis
+- Add `restore` command to restore the analysis options file to its original location
+  - This is only necessary if you ctrl-c the process while it is running
+
 ## 0.0.10 | 11.4.25
 
 - Format files after fixing imports if `format` is true in the config
