@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.0.10 | 11.4.25
+
+- Format files after fixing imports if `format` is true in the config
+- Add ignore comments for types with `deprecated_member_use` annotations
+
 ## 0.0.9 | 11.4.25
 
 - Fix bug where the stdout was not being logged
