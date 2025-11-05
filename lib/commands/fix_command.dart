@@ -116,7 +116,7 @@ class FixCommand {
       _ => Config(),
     };
 
-    analyzer.initialize(root: fs.currentDirectory.path);
+    await analyzer.initialize(root: fs.currentDirectory.path);
 
     final cleanedFiles = [
       for (final file in files)

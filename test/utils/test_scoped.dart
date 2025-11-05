@@ -4,6 +4,7 @@ import 'package:import_ozempic/deps/find.dart';
 import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/deps/log.dart';
 import 'package:import_ozempic/deps/platform.dart';
+import 'package:import_ozempic/deps/process.dart';
 import 'package:meta/meta.dart';
 import 'package:scoped_deps/scoped_deps.dart';
 import 'package:test/test.dart';
@@ -16,7 +17,7 @@ void testScoped(
   String Function()? cwd,
   bool initializeAnalyzer = false,
 }) {
-  test(description, () {
+  test(description, () async {
     final testProviders = {
       analyzerProvider,
       if (fileSystem?.call() case final FileSystem fs)
@@ -26,11 +27,14 @@ void testScoped(
       findProvider,
       logProvider,
       platformProvider,
+      processProvider,
     };
 
-    runScoped(values: testProviders, () {
+    await runScoped(values: testProviders, () async {
       if (initializeAnalyzer) {
-        analyzer.initialize(root: cwd?.call() ?? fs.currentDirectory.path);
+        await analyzer.initialize(
+          root: cwd?.call() ?? fs.currentDirectory.path,
+        );
       }
 
       fn();

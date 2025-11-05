@@ -1,5 +1,7 @@
 import 'package:import_ozempic/commands/fix_command.dart';
+import 'package:import_ozempic/commands/restore_command.dart';
 import 'package:import_ozempic/commands/update_command.dart';
+import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/is_up_to_date.dart';
 import 'package:import_ozempic/deps/log.dart';
 import 'package:import_ozempic/domain/args.dart';
@@ -11,6 +13,7 @@ Usage: import_ozempic <command> <arguments>
 Commands:
   fix <files...>   Fix the imports in the given files
   update           Update the package to the latest version
+  restore          Restore the analysis options files to their original location
 
 
 Flags:
@@ -30,12 +33,16 @@ class ImportOzempic {
         case ['fix', ...final files]:
           exitCode = await FixCommand(args: args).run(files);
         case ['update']:
-          exitCode = await UpdateCommand().run();
+          exitCode = await UpdateCommand(args: args).run();
+        case ['restore']:
+          exitCode = await RestoreCommand(args: args).run();
         default:
           log(_usage);
           exitCode = 1;
       }
     }
+
+    await analyzer.dispose();
 
     if (!await isUpToDate.check()) {
       final latestVersion = await isUpToDate.latestVersion();

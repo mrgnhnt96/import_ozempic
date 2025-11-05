@@ -1,12 +1,29 @@
 import 'package:import_ozempic/deps/is_up_to_date.dart';
 import 'package:import_ozempic/deps/log.dart';
+import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/gen/pkg.dart';
 import 'package:import_ozempic/gen/version.dart';
 
+const _usage = '''
+Usage: import_ozempic update
+
+Updates the package to the latest version.
+
+Flags:
+  --help     Print this help message
+''';
+
 class UpdateCommand {
-  const UpdateCommand();
+  const UpdateCommand({required this.args});
+
+  final Args args;
 
   Future<int> run() async {
+    if (args['help'] case true) {
+      log(_usage);
+      return 0;
+    }
+
     final isUpdated = await isUpToDate.check();
 
     if (isUpdated) {

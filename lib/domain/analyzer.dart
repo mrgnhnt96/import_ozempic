@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
-import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:import_ozempic/deps/find.dart';
 import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/deps/log.dart';
 import 'package:import_ozempic/deps/platform.dart';
+import 'package:import_ozempic/domain/analysis_options.dart';
 import 'package:import_ozempic/domain/units.dart';
 
 typedef AnalyzeFileResult = (
@@ -17,9 +17,11 @@ typedef AnalyzeFileResult = (
 );
 
 class Analyzer {
-  Analyzer() : _provider = PhysicalResourceProvider();
+  Analyzer() : _provider = PhysicalResourceProvider(), _analysisOptions = [];
 
-  ResourceProvider _provider;
+  final List<AnalysisOptions> _analysisOptions;
+
+  PhysicalResourceProvider _provider;
   AnalysisContextCollection? _analysisCollection;
   AnalysisContextCollection get analysisCollection {
     if (_analysisCollection case final collection?) {
@@ -31,11 +33,27 @@ class Analyzer {
 
   String get sdkPath => fs.file(platform.resolvedExecutable).parent.parent.path;
 
-  void initialize({required String root}) {
+  Future<void> initialize({required String root}) async {
     final path = switch (fs.path.isAbsolute(root)) {
       true => root,
       false => fs.file(root).absolute.path,
     };
+
+    final analysisOptions = await find.file(
+      AnalysisOptions.name,
+      workingDirectory: fs.currentDirectory.path,
+    );
+
+    for (final option in analysisOptions) {
+      final file = fs.file(option);
+      if (!file.existsSync()) {
+        continue;
+      }
+
+      final options = AnalysisOptions(path: option)..makeTemporary();
+
+      _analysisOptions.add(options);
+    }
 
     try {
       _analysisCollection = AnalysisContextCollection(
@@ -48,6 +66,15 @@ class Analyzer {
 
       rethrow;
     }
+  }
+
+  Future<void> dispose() async {
+    for (final option in _analysisOptions) {
+      option.restore();
+    }
+
+    await _analysisCollection?.dispose();
+    _analysisCollection = null;
   }
 
   /// Analyzes the given path and returns the resolved unit results.
