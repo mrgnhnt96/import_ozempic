@@ -1,6 +1,8 @@
 import 'package:file/file.dart';
+import 'package:import_ozempic/commands/fix_command.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/fs.dart';
+import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/import_type_collector.dart';
 import 'package:test/test.dart';
@@ -23,7 +25,7 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'pattern_field_name.dart'),
+          fs.path.join(cwd(fs), 'lib', 'inputs', 'pattern_field_name.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -50,7 +52,7 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'bloc.dart'),
+          fs.path.join(cwd(fs), 'lib', 'inputs', 'bloc.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -78,7 +80,13 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'named_type', 'future_and_stream.dart'),
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'named_type',
+            'future_and_stream.dart',
+          ),
         ]);
 
         final lib = await (results.single.$2)();
@@ -97,7 +105,13 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'named_type', 'type_aliases.dart'),
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'named_type',
+            'type_aliases.dart',
+          ),
         ]);
 
         final lib = await (results.single.$2)();
@@ -123,7 +137,13 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'named_type', 'return_types.dart'),
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'named_type',
+            'return_types.dart',
+          ),
         ]);
 
         final lib = await (results.single.$2)();
@@ -148,7 +168,13 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'simple_identifier', 'env_globals.dart'),
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'simple_identifier',
+            'env_globals.dart',
+          ),
         ]);
 
         final lib = await (results.single.$2)();
@@ -180,6 +206,7 @@ void main() {
           fs.path.join(
             cwd(fs),
             'lib',
+            'inputs',
             'simple_identifier',
             'math_globals.dart',
           ),
@@ -218,12 +245,49 @@ void main() {
     );
 
     testScoped(
+      'should resolve files within excluded files',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        final cmd = FixCommand(args: Args());
+        final results = await analyzer.analyze([
+          fs.path.join(cwd(fs), 'lib', 'inputs', 'file_with_gen.dart'),
+        ]);
+
+        final parts = cmd.getParts(results.single.$1);
+
+        final partsResults = await analyzer.analyze(parts);
+
+        final lib = await (results.single.$2)();
+        final partsLib = await (partsResults.single.$2)();
+
+        lib.unit.accept(collector);
+        partsLib.unit.accept(collector);
+
+        final references = collector.references;
+
+        final [privateClass, globalFn] = references.toList();
+
+        expect(
+          privateClass.import,
+          Import('package:_extensions/inputs/file_with_gen.dart'),
+        );
+        expect(privateClass.prefix, isNull);
+        expect(
+          globalFn.import,
+          Import('package:_extensions/globals/global_function.dart'),
+        );
+        expect(globalFn.prefix, isNull);
+      },
+    );
+
+    testScoped(
       'should get type extensions',
       cwd: () => cwd(fs),
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'bloc_extension_type.dart'),
+          fs.path.join(cwd(fs), 'lib', 'inputs', 'bloc_extension_type.dart'),
         ]);
 
         final lib = await (results.single.$2)();
@@ -248,7 +312,7 @@ void main() {
       initializeAnalyzer: true,
       () async {
         final results = await analyzer.analyze([
-          fs.path.join(cwd(fs), 'lib', 'declaration.dart'),
+          fs.path.join(cwd(fs), 'lib', 'inputs', 'declaration.dart'),
         ]);
 
         final lib = await (results.single.$2)();

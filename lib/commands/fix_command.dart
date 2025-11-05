@@ -270,7 +270,7 @@ class FixCommand {
       resolvedImport.path = parsed.path;
     }
 
-    final parts = await analyzer.analyze(_getParts(parsed));
+    final parts = await analyzer.analyze(getParts(parsed));
 
     for (final part in [lib].followedBy(parts)) {
       final (_, resolved) = part;
@@ -288,7 +288,8 @@ class FixCommand {
     return resolvedImport..addAll(collector.references);
   }
 
-  List<String> _getParts(ParsedUnitResult parsed) {
+  @visibleForTesting
+  List<String> getParts(ParsedUnitResult parsed) {
     Iterable<String> parts() sync* {
       final lines = parsed.content.split('\n');
 
