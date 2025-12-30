@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.0.12 | 12.30.25
+
+### Fixes
+
+- Fixes issue where the script would fail because of an unwrapped directory pattern
+  - Applies only to Linux and macOS
+
+### Enhancements
+
+- Add `loud` flag to print more verbose output
+
 ## 0.0.11 | 11.4.25
 
 - Move analysis options file to a temporary location to prevent any paths from being excluded from analysis
