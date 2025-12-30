@@ -23,6 +23,7 @@ class Find {
     'linux',
     'web',
     'assets',
+    '.dart_tool',
   ];
 
   Future<List<String>> file(
@@ -60,7 +61,7 @@ class Find {
   }) async {
     final ignore = <String>[
       for (final (index, dir) in _ignoreDirs.followedBy(ignoreDirs).indexed)
-        [if (index != 0) '-o', '-path', '*/$dir'].join(' '),
+        [if (index != 0) '-o', '-path', "'*/$dir'"].join(' '),
     ];
 
     final type = file ? 'f' : 'd';
