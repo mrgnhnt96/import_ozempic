@@ -116,6 +116,8 @@ class FixCommand {
       _ => Config(),
     };
 
+    log.debug('Config: $config');
+
     await analyzer.initialize(root: fs.currentDirectory.path);
 
     final cleanedFiles = [
@@ -123,7 +125,10 @@ class FixCommand {
         if (file == '.') fs.currentDirectory.path else file,
     ];
 
+    log.debug('Cleaned files: $cleanedFiles');
+
     final results = await analyzer.analyze(cleanedFiles);
+    log.debug('Analyzed (${results.length} results)');
 
     final libraries =
         <(ParsedUnitResult, Future<ResolvedUnitResult> Function())>[];
@@ -146,9 +151,16 @@ class FixCommand {
     }
 
     if (libraries.isEmpty) {
-      log('No files were found to fix');
+      log.debug("Didn't find any libraries..");
+      log.error('No files were found to fix');
+
       if (files.isNotEmpty) {
-        log('Provide files that do not contain `part of` directives');
+        log.debug('Found ${files.length} files');
+        for (final file in files) {
+          log.debug('  - $file');
+        }
+
+        log.info('Provide files that do not contain `part of` directives');
       }
       return 0;
     }

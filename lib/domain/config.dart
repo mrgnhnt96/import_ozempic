@@ -66,4 +66,9 @@ class Config {
 
     return false;
   }
+
+  @override
+  String toString() {
+    return 'exclude: $exclude, format: $format';
+  }
 }

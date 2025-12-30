@@ -1,5 +1,5 @@
 install:
-  - dart pub global deactivate lint_kit_cli || true
+  - dart pub global deactivate import_ozempic || true
   - rm -rf .dart_tool
   - rm pubspec.lock
   - dart pub get

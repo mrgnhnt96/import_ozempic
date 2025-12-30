@@ -82,27 +82,43 @@ class Analyzer {
   /// If the path is a file, it will be analyzed as a single file.
   /// If the path is a directory, it will be analyzed as a directory.
   Future<List<AnalyzeFileResult>> analyze(List<String> paths) async {
-    final result = <AnalyzeFileResult>[];
+    final analyzed = <AnalyzeFileResult>[];
 
     for (final p in paths) {
       final path = switch (fs.path.isAbsolute(p)) {
         true => p,
-        false => fs.file(p).absolute.path,
+        false => fs.path.canonicalize(
+          fs.path.join(fs.currentDirectory.path, p),
+        ),
       };
 
-      if (fs.isDirectorySync(path)) {
-        result.addAll(await _analyzeDirectory(path));
-      } else if (fs.isFileSync(path)) {
-        if (await _analyzeFile(path) case final resolved?) {
-          result.add(resolved);
+      try {
+        if (fs.isDirectorySync(path)) {
+          final results = await _analyzeDirectory(path);
+          analyzed.addAll(results);
+        } else if (fs.isFileSync(path)) {
+          if (await _analyzeFile(path) case final result?) {
+            analyzed.add(result);
+          } else {
+            log.error('Could not analyze file: $path');
+            log.info(
+              'Make sure that your current directory is the root of your project',
+            );
+            continue;
+          }
+        } else {
+          log.error('Invalid path: $path');
+          continue;
         }
-      } else {
-        log('Invalid path: $path');
+      } catch (e) {
+        log.debugError('Error analyzing path: $path');
+        log.debugError('  ---  ');
+        log.debugError(e);
         continue;
       }
     }
 
-    return result;
+    return analyzed;
   }
 
   Future<AnalyzeFileResult?> _analyzeFile(String path) async {
@@ -122,11 +138,16 @@ class Analyzer {
     final results = <AnalyzeFileResult>[];
     final files = await find.file('*.dart', workingDirectory: path);
 
+    log.debug('  - Found ${files.length} files to analyze');
+
     AnalysisContext context;
     for (final file in files) {
       try {
         context = analysisCollection.contextFor(file);
-      } catch (_) {
+      } catch (e) {
+        log.debugError('Could not analyze file: $file');
+        log.debugError('  ---  ');
+        log.debugError(e);
         continue;
       }
 

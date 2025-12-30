@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:import_ozempic/deps/analyzer.dart';
+import 'package:import_ozempic/deps/args.dart';
 import 'package:import_ozempic/deps/find.dart';
 import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/deps/is_up_to_date.dart';
@@ -17,11 +18,10 @@ void main(List<String> arguments) async {
 }
 
 void run(List<String> arguments) async {
-  final args = Args.parse(arguments);
-
   exitCode = await runScoped(
-    () => ImportOzempic().run(args),
+    () => ImportOzempic().run(),
     values: {
+      argsProvider.overrideWith(() => Args.parse(arguments)),
       fsProvider,
       platformProvider,
       logProvider,

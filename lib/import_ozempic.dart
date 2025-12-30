@@ -2,9 +2,9 @@ import 'package:import_ozempic/commands/fix_command.dart';
 import 'package:import_ozempic/commands/restore_command.dart';
 import 'package:import_ozempic/commands/update_command.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
+import 'package:import_ozempic/deps/args.dart';
 import 'package:import_ozempic/deps/is_up_to_date.dart';
 import 'package:import_ozempic/deps/log.dart';
-import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/gen/version.dart';
 
 const _usage = '''
@@ -23,31 +23,33 @@ Flags:
 class ImportOzempic {
   const ImportOzempic();
 
-  Future<int> run(Args args) async {
+  Future<int> run() async {
     int exitCode = 0;
 
-    if (args['version'] case true) {
-      log(version);
-    } else {
-      try {
-        switch (args.path) {
-          case ['fix', ...final files]:
-            exitCode = await FixCommand(args: args).run(files);
-          case ['update']:
-            exitCode = await UpdateCommand(args: args).run();
-          case ['restore']:
-            exitCode = await RestoreCommand(args: args).run();
-          default:
-            log(_usage);
-            exitCode = 1;
+    try {
+      if (args['version'] case true) {
+        log(version);
+      } else {
+        try {
+          switch (args.path) {
+            case ['fix', ...final files]:
+              exitCode = await FixCommand(args: args).run(files);
+            case ['update']:
+              exitCode = await UpdateCommand(args: args).run();
+            case ['restore']:
+              exitCode = await RestoreCommand(args: args).run();
+            default:
+              log(_usage);
+              exitCode = 1;
+          }
+        } catch (e) {
+          log('Error running command: $e');
+          exitCode = 1;
         }
-      } catch (e) {
-        log('Error running command: $e');
-        exitCode = 1;
       }
+    } finally {
+      await analyzer.dispose();
     }
-
-    await analyzer.dispose();
 
     if (!await isUpToDate.check()) {
       final latestVersion = await isUpToDate.latestVersion();
