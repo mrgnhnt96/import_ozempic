@@ -1,9 +1,11 @@
 install:
-  - dart pub global deactivate import_ozempic || true
-  - rm -rf .dart_tool
-  - rm pubspec.lock
-  - dart pub get
-  - dart pub global activate --source path . --overwrite
+  (aliases): i
+  (command):
+    - dart pub global deactivate import_ozempic || true
+    - rm -rf .dart_tool
+    - rm pubspec.lock
+    - dart pub get
+    - dart pub global activate --source path . --overwrite
 
 lint: dart analyze . --fatal-infos --fatal-warnings
 
