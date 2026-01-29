@@ -237,7 +237,9 @@ class FixCommand {
           continue;
         }
 
-        startContent = lines.sublist(0, index).join('\n');
+        final reversedIndex = lines.length - index;
+
+        startContent = lines.sublist(0, reversedIndex).join('\n');
         break;
       }
     }

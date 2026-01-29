@@ -310,7 +310,6 @@ void main() {}
           write('''
 // ignore_for_file: avoid_dynamic_calls, inference_failure_on_untyped_parameter
 // ignore_for_file: avoid_redundant_argument_values
-
 // dart format off
 import 'dart:async';
 import 'package:flutter/material.dart';
