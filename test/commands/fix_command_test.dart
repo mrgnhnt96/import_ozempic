@@ -204,6 +204,154 @@ void main() {}
 ''');
         },
       );
+
+      testScoped(
+        'should detect white space between format comments',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+// dart format off
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+
+// dart format on
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:test/test.dart'),
+                associatedElement: _FakeElement(displayName: 'Test'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(reference, config: Config());
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+// dart format off
+import 'package:test/test.dart' show Test;
+// dart format on
+
+void main() {}
+''');
+        },
+      );
+
+      testScoped(
+        'keep library name when present',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+/// some library comment
+library file;
+
+// dart format off
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+// dart format on
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:test/test.dart'),
+                associatedElement: _FakeElement(displayName: 'Test'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(reference, config: Config());
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+/// some library comment
+library file;
+
+// dart format off
+import 'package:test/test.dart' show Test;
+// dart format on
+
+void main() {}
+''');
+        },
+      );
+      testScoped(
+        'should keep top level comments',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+// ignore_for_file: avoid_dynamic_calls, inference_failure_on_untyped_parameter
+// ignore_for_file: avoid_redundant_argument_values
+
+// dart format off
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+// dart format on
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:test/test.dart'),
+                associatedElement: _FakeElement(displayName: 'Test'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(reference, config: Config());
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+// ignore_for_file: avoid_dynamic_calls, inference_failure_on_untyped_parameter
+// ignore_for_file: avoid_redundant_argument_values
+
+// dart format off
+import 'package:test/test.dart' show Test;
+// dart format on
+
+void main() {}
+''');
+        },
+      );
     });
   });
 }

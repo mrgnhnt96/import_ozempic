@@ -193,13 +193,23 @@ class FixCommand {
     int? importEnd;
     int? commentStart;
 
-    final skippable = ['as', 'hide', 'show', 'export', RegExp(r'^\w+[,;]$')];
+    final skippable = [
+      'library',
+      'as',
+      'hide',
+      'show',
+      'export',
+      RegExp(r'^\w+[,;]$'),
+    ];
 
     for (final (index, line) in lines.indexed) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
       if (trimmed.startsWith('//')) {
-        commentStart ??= index;
+        if (trimmed != '// dart format on') {
+          commentStart ??= index;
+        }
+
         continue;
       }
 
@@ -208,10 +218,6 @@ class FixCommand {
       }
 
       if (trimmed.startsWith('import ')) {
-        if (index > 0 && lines[index - 1].startsWith('// dart format off')) {
-          importStart ??= index - 1;
-        }
-
         importStart ??= index;
         commentStart = null;
         continue;
@@ -236,10 +242,7 @@ class FixCommand {
     }
 
     final contentStart = lines.take(importStart).join('\n');
-    final contentEnd = switch (lines.sublist(importEnd)) {
-      ['// dart format on', ...final lines] => lines.join('\n'),
-      final lines => lines.join('\n'),
-    };
+    final contentEnd = lines.sublist(importEnd).join('\n');
 
     final (:dart, :relative, :package) = imports(
       trailComments: !_config.format,
@@ -257,9 +260,27 @@ class FixCommand {
       importStatements.insert(importStatements.length - 1, '// dart format on');
     }
 
+    String? startContent = null;
+
+    if (contentStart.trim() case final String start when start.isNotEmpty) {
+      final lines = start.split('\n');
+      for (final (index, line) in lines.reversed.indexed) {
+        if (line.trim().isEmpty) {
+          continue;
+        }
+
+        if (line.trim() == '// dart format off') {
+          continue;
+        }
+
+        startContent = lines.sublist(0, index).join('\n');
+        break;
+      }
+    }
+
     var content = [
-      if (contentStart.trim() case final String start when start.isNotEmpty)
-        start,
+      if (startContent?.trim() case final String start when start.isNotEmpty)
+        '$start\n',
       ...importStatements,
       contentEnd.trim(),
       '',
