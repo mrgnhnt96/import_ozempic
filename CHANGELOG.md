@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.14 | 1.29.26
+
+- Fix issue where the last line of grouped comments at the start of the file would be lost
+
 ## 0.0.13 | 1.29.26
 
 - Fix issue where duplicate import would be added if a constructor was used with an import prefix
