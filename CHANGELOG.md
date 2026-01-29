@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.0.13 | 1.29.26
+
+- Fix issue where duplicate import would be added if a constructor was used with an import prefix
+- Fix issue where `library` statements were not being maintained when fixing imports
+- Fix issue where `dart format on` comments were not being removed if whitespace (line breaks) were present
+
 ## 0.0.12 | 12.30.25
 
 ### Fixes
