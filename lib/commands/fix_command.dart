@@ -44,11 +44,6 @@ class FixCommand {
       return exitCode;
     }
 
-    log('');
-    if (await _fixAnalysisErrors(files) case final int exitCode) {
-      return exitCode;
-    }
-
     if (config.format) {
       log('');
       if (await _format(files) case final int exitCode) {
@@ -72,37 +67,6 @@ class FixCommand {
       return result.exitCode;
     }
 
-    await for (final line in result.stdout.transform(utf8.decoder)) {
-      log(line);
-    }
-
-    return null;
-  }
-
-  Future<int?> _fixAnalysisErrors(List<String> files) async {
-    log('Fixing unused imports in files');
-
-    final result = await process('dart', [
-      'fix',
-      ...files,
-      '--apply',
-      '--code',
-      'unused_import',
-      '--code',
-      'unnecessary_import',
-      '--code',
-      'unused_shown_name',
-    ]);
-
-    if (await result.exitCode != 0) {
-      log('Failed to fix analysis errors in files');
-      await for (final line in result.stderr.transform(utf8.decoder)) {
-        log(line);
-      }
-      return result.exitCode;
-    }
-
-    log('Analysis errors fixed in files');
     await for (final line in result.stdout.transform(utf8.decoder)) {
       log(line);
     }

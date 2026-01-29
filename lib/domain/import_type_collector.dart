@@ -227,12 +227,15 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
             );
           }
         }
-      case InstanceCreationExpression(:final InterfaceType staticType):
+      case InstanceCreationExpression(
+        :final InterfaceType staticType,
+        :final constructorName,
+      ):
         _addReference(
           Reference(
             lib: staticType.element.library,
             associatedElement: staticType.element,
-            prefix: prefix,
+            prefix: prefix ?? constructorName.type.importPrefix?.name.lexeme,
           ),
         );
     }
