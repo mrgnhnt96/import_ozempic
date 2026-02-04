@@ -82,14 +82,17 @@ class FixCommand {
 
     log.debug('Config: $config');
 
-    await analyzer.initialize(root: fs.currentDirectory.path);
-
     final cleanedFiles = [
       for (final file in files)
         if (file == '.') fs.currentDirectory.path else file,
     ];
 
     log.debug('Cleaned files: $cleanedFiles');
+
+    final root = _findCommonRoot(cleanedFiles);
+    log.debug('Using root: $root');
+
+    await analyzer.initialize(root: root);
 
     final results = await analyzer.analyze(cleanedFiles);
     log.debug('Analyzed (${results.length} results)');
@@ -285,6 +288,73 @@ class FixCommand {
     }
 
     return resolvedImport..addAll(collector.references);
+  }
+
+  /// Finds the common root directory that contains all the provided paths.
+  ///
+  /// For files, uses their parent directory. For directories, uses the directory itself.
+  /// Returns the current directory if no valid paths are provided.
+  String _findCommonRoot(List<String> paths) {
+    if (paths.isEmpty) {
+      return fs.currentDirectory.path;
+    }
+
+    final absolutePaths = <String>[];
+    for (final path in paths) {
+      final absolutePath = switch (fs.path.isAbsolute(path)) {
+        true => path,
+        false => fs.path.canonicalize(
+          fs.path.join(fs.currentDirectory.path, path),
+        ),
+      };
+
+      // For files, use their parent directory
+      if (fs.isFileSync(absolutePath)) {
+        absolutePaths.add(fs.path.dirname(absolutePath));
+      } else if (fs.isDirectorySync(absolutePath)) {
+        absolutePaths.add(absolutePath);
+      }
+    }
+
+    if (absolutePaths.isEmpty) {
+      return fs.currentDirectory.path;
+    }
+
+    // Normalize all paths
+    final normalizedPaths = absolutePaths
+        .map((p) => fs.path.normalize(p))
+        .toList();
+
+    // Use the first path as a starting point
+    var candidate = normalizedPaths.first;
+
+    // Walk up the directory tree from the first path
+    while (true) {
+      // Check if all paths are within or equal to the candidate
+      final allContained = normalizedPaths.every((path) {
+        // Check if path equals candidate or is a subdirectory
+        if (path == candidate) return true;
+        // Check if path starts with candidate + separator
+        final relative = fs.path.relative(path, from: candidate);
+        return !relative.startsWith('..') && !fs.path.isAbsolute(relative);
+      });
+
+      if (allContained) {
+        return candidate;
+      }
+
+      // Move up one directory level
+      final parent = fs.path.dirname(candidate);
+      if (parent == candidate) {
+        // Reached root, can't go higher
+        break;
+      }
+      candidate = parent;
+    }
+
+    // Fallback: if we can't find a common root, use current directory
+    // This handles edge cases like paths on different drives (Windows)
+    return fs.currentDirectory.path;
   }
 
   @visibleForTesting
