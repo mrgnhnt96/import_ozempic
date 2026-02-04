@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.15 | 2.3.26
+
+- Fix issue where the fix command would hang when receiving more than 1 directories
+
 ## 0.0.14 | 1.29.26
 
 - Fix issue where the last line of grouped comments at the start of the file would be lost
