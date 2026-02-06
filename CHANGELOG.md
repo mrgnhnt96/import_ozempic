@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.16 | 2.6.26
+
+- Fixes issue where the update command would check for updates, after updating the package
+
 ## 0.0.15 | 2.3.26
 
 - Fix issue where the fix command would hang when receiving more than 1 directories

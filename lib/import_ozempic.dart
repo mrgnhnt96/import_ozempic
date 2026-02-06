@@ -35,7 +35,7 @@ class ImportOzempic {
             case ['fix', ...final files]:
               exitCode = await FixCommand(args: args).run(files);
             case ['update']:
-              exitCode = await UpdateCommand(args: args).run();
+              return exitCode = await UpdateCommand(args: args).run();
             case ['restore']:
               exitCode = await RestoreCommand(args: args).run();
             default:
