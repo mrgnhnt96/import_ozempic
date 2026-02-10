@@ -3,6 +3,8 @@
 ## 0.0.17 | 2.10.26
 
 - Fix import parsing to correctly handle multi-line `show` and `hide` clauses that span multiple lines until the terminating semicolon
+- Fix part file detection to use shared import-block logic, so parts are correctly found when imports use multi-line show/hide
+- Support both single- and double-quoted paths in part directives
 
 ## 0.0.16 | 2.6.26
 

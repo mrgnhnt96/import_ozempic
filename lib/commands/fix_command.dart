@@ -143,19 +143,13 @@ class FixCommand {
     return null;
   }
 
+  /// Finds the indices of the import block (library, import, export directives)
+  /// and the index of the first line after it. Handles multi-line show/hide
+  /// clauses correctly.
   @visibleForTesting
-  Future<void> updateImportStatements(
-    ResolvedReferences import, {
-    Config? config,
-  }) async {
-    final _config = config ?? Config();
-    final ResolvedReferences(:path, :imports, :hasImports) = import;
-
-    if (path == null) return;
-    if (!hasImports) return;
-
-    final lines = fs.file(path).readAsLinesSync();
-
+  static ({int? importStart, int? importEnd}) findImportBlockIndices(
+    List<String> lines,
+  ) {
     int? importStart;
     int? importEnd;
     int? commentStart;
@@ -177,6 +171,10 @@ class FixCommand {
           : line;
       return withoutComment.endsWith(';');
     }
+
+    bool skippableMatches(String trimmed) => skippable.any(
+      (s) => s is RegExp ? s.hasMatch(trimmed) : trimmed.startsWith(s),
+    );
 
     for (final (index, line) in lines.indexed) {
       final trimmed = line.trim();
@@ -204,7 +202,7 @@ class FixCommand {
         continue;
       }
 
-      if (skippable.any(trimmed.startsWith)) {
+      if (skippableMatches(trimmed)) {
         continue;
       }
 
@@ -218,22 +216,43 @@ class FixCommand {
       break;
     }
 
-    if (importStart == null) {
+    return (importStart: importStart, importEnd: importEnd);
+  }
+
+  @visibleForTesting
+  Future<void> updateImportStatements(
+    ResolvedReferences import, {
+    Config? config,
+  }) async {
+    final _config = config ?? Config();
+    final ResolvedReferences(:path, :imports, :hasImports) = import;
+
+    if (path == null) return;
+    if (!hasImports) return;
+
+    final lines = fs.file(path).readAsLinesSync();
+
+    final (importStart: importStart, importEnd: importEnd) =
+        findImportBlockIndices(lines);
+
+    var start = importStart;
+    if (start == null) {
       if (importEnd != null) {
-        importStart = importEnd;
+        start = importEnd;
       } else {
         log('No import start found for ${fs.path.relative(path)}');
         return;
       }
     }
 
-    if (importEnd == null) {
+    final end = importEnd;
+    if (end == null) {
       log('No import end found for ${fs.path.relative(path)}');
       return;
     }
 
-    final contentStart = lines.take(importStart).join('\n');
-    final contentEnd = lines.sublist(importEnd).join('\n');
+    final contentStart = lines.take(start).join('\n');
+    final contentEnd = lines.sublist(end).join('\n');
 
     final (:dart, :relative, :package) = imports(
       trailComments: !_config.format,
@@ -296,7 +315,10 @@ class FixCommand {
       resolvedImport.path = parsed.path;
     }
 
-    final parts = await analyzer.analyze(getParts(parsed));
+    final partDirectives = getParts(parsed);
+    log.debug('Part directives: $partDirectives');
+
+    final parts = await analyzer.analyze(partDirectives);
 
     for (final part in [lib].followedBy(parts)) {
       final (_, resolved) = part;
@@ -383,28 +405,34 @@ class FixCommand {
 
   @visibleForTesting
   List<String> getParts(ParsedUnitResult parsed) {
-    Iterable<String> parts() sync* {
-      final lines = parsed.content.split('\n');
+    final lines = parsed.content.split('\n');
+    final result = findImportBlockIndices(lines);
+    final startIndex = result.importEnd ?? 0;
 
-      const avoid = ['export', 'import', 'library', 'as', 'show', 'hide', '//'];
+    final quote = RegExp(
+      "'|"
+      '"',
+    );
 
-      for (final line in lines) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        if (avoid.any(trimmed.startsWith)) continue;
+    final parts = <String>[];
+    for (var i = startIndex; i < lines.length; i++) {
+      final trimmed = lines[i].trim();
+      if (trimmed.isEmpty) continue;
 
-        if (!trimmed.startsWith('part')) {
-          break;
-        }
+      if (!trimmed.startsWith('part')) break;
 
-        if (trimmed.split("'") case [_, final String part, ...]) {
-          yield fs.path.normalize(
-            fs.path.join(fs.path.dirname(parsed.path), part),
-          );
-        }
+      final split = trimmed.split(quote);
+      final partPath = split.length >= 2 ? split[1] : null;
+
+      if (partPath != null && partPath.isNotEmpty) {
+        parts.add(
+          fs.path.normalize(
+            fs.path.join(fs.path.dirname(parsed.path), partPath),
+          ),
+        );
       }
     }
 
-    return parts().toList();
+    return parts;
   }
 }

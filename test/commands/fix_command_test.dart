@@ -26,6 +26,35 @@ void main() {
   }
 
   group(FixCommand, () {
+    group('#findImportBlockIndices', () {
+      test('should find index after import block with multi-line show/hide', () {
+        final lines = [
+          "library foo;",
+          "import 'package:a.dart'",
+          "    show",
+          "        Foo,",
+          "        Bar;",
+          "part 'data/__post_data.dart';",
+          "class MyClass {}",
+        ];
+        final result = FixCommand.findImportBlockIndices(lines);
+        expect(result.importStart, 1);
+        expect(result.importEnd, 5); // Index of first part line
+      });
+
+      test('should find index when parts follow imports', () {
+        final lines = [
+          "import 'package:a.dart';",
+          "part '__view.dart';",
+          "part 'components/__body.dart';",
+          "void main() {}",
+        ];
+        final result = FixCommand.findImportBlockIndices(lines);
+        expect(result.importStart, 0);
+        expect(result.importEnd, 1); // Index of first part line
+      });
+    });
+
     group('#updateImportStatements', () {
       testScoped(
         'should include dart format comments if present',
