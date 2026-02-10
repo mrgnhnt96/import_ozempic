@@ -169,6 +169,15 @@ class FixCommand {
       RegExp(r'^\w+[,;]$'),
     ];
 
+    var inShowOrHide = false;
+
+    bool endsWithSemicolon(String line) {
+      final withoutComment = line.contains('//')
+          ? line.substring(0, line.indexOf('//')).trimRight()
+          : line;
+      return withoutComment.endsWith(';');
+    }
+
     for (final (index, line) in lines.indexed) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
@@ -177,6 +186,21 @@ class FixCommand {
           commentStart ??= index;
         }
 
+        continue;
+      }
+
+      // When inside a multi-line show/hide clause, continue until we find
+      // the terminating semicolon (ignoring any trailing comment).
+      if (inShowOrHide) {
+        if (endsWithSemicolon(trimmed)) {
+          inShowOrHide = false;
+        }
+        continue;
+      }
+
+      // A line starting with show/hide may span multiple lines until `;`.
+      if (trimmed.startsWith('show') || trimmed.startsWith('hide')) {
+        inShowOrHide = !endsWithSemicolon(trimmed);
         continue;
       }
 

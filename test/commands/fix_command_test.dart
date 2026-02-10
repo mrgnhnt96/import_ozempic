@@ -253,6 +253,93 @@ void main() {}
       );
 
       testScoped(
+        'should parse multi-line show clauses until semicolon',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+import 'package:couchsurfing_application/blocs/community_bloc.dart'
+    show
+        \$CommunityBlocEventsX,
+        \$CommunityStateTypingX,
+        CommunityBloc,
+        CommunityState;
+import 'package:couchsurfing_application/blocs/post_bloc.dart'
+    show \$PostBlocEventsX, \$PostStateTypingX, PostBloc, PostState;
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:couchsurfing_application/blocs/community_bloc.dart'),
+                associatedElement: _FakeElement(displayName: 'CommunityBloc'),
+              ),
+              Reference(
+                lib: _FakeLibrary(uri: 'package:couchsurfing_application/blocs/post_bloc.dart'),
+                associatedElement: _FakeElement(displayName: 'PostBloc'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(
+            reference,
+            config: Config(format: true),
+          );
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+import 'package:couchsurfing_application/blocs/community_bloc.dart' show CommunityBloc;
+import 'package:couchsurfing_application/blocs/post_bloc.dart' show PostBloc;
+
+void main() {}
+''');
+        },
+      );
+
+      testScoped(
+        'should parse multi-line show with comment after semicolon',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+import 'package:foo/bar.dart'
+    show
+        Foo,
+        Bar; // ignore: depend_on_referenced_packages
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:foo/bar.dart'),
+                associatedElement: _FakeElement(displayName: 'Foo'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(
+            reference,
+            config: Config(format: true),
+          );
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+import 'package:foo/bar.dart' show Foo;
+
+void main() {}
+''');
+        },
+      );
+
+      testScoped(
         'keep library name when present',
         fileSystem: () => memoryFs,
         cwd: () => memoryFs.currentDirectory.path,

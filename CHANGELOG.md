@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.17 | 2.10.26
+
+- Fix import parsing to correctly handle multi-line `show` and `hide` clauses that span multiple lines until the terminating semicolon
+
 ## 0.0.16 | 2.6.26
 
 - Fixes issue where the update command would check for updates, after updating the package
