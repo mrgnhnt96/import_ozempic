@@ -143,6 +143,56 @@ class FixCommand {
     return null;
   }
 
+  /// Removes `// dart format on` and `// dart format off` lines that appear
+  /// between part directives, along with any surrounding blank lines.
+  @visibleForTesting
+  static String removeDartFormatCommentsBetweenParts(List<String> lines) {
+    final result = <String>[];
+    var i = 0;
+    while (i < lines.length) {
+      final line = lines[i];
+      final trimmed = line.trim();
+
+      final isPart = trimmed.startsWith('part ') &&
+          (trimmed.contains("'") || trimmed.contains('"'));
+
+      if (isPart) {
+        result.add(line);
+        i++;
+        // Look ahead: skip blanks and dart format comment(s); if we reach a
+        // part directive, drop the skipped content (comment + line breaks).
+        if (i < lines.length) {
+          var j = i;
+          while (j < lines.length) {
+            final t = lines[j].trim();
+            if (t.isEmpty) {
+              j++;
+              continue;
+            }
+            if (t == '// dart format on' || t == '// dart format off') {
+              j++;
+              continue;
+            }
+            if (t.startsWith('part ') &&
+                (t.contains("'") || t.contains('"'))) {
+              i = j;
+              break;
+            }
+            break;
+          }
+        }
+        continue;
+      }
+
+      result.add(line);
+      i++;
+    }
+    return result.join('\n');
+  }
+
+  static String _removeDartFormatCommentsBetweenParts(List<String> lines) =>
+      removeDartFormatCommentsBetweenParts(lines);
+
   /// Finds the indices of the import block (library, import, export directives)
   /// and the index of the first line after it. Handles multi-line show/hide
   /// clauses correctly.
@@ -252,7 +302,7 @@ class FixCommand {
     }
 
     final contentStart = lines.take(start).join('\n');
-    final contentEnd = lines.sublist(end).join('\n');
+    final contentEnd = _removeDartFormatCommentsBetweenParts(lines.sublist(end));
 
     final (:dart, :relative, :package) = imports(
       trailComments: !_config.format,
@@ -294,7 +344,7 @@ class FixCommand {
       if (startContent?.trim() case final String start when start.isNotEmpty)
         '$start\n',
       ...importStatements,
-      contentEnd.trim(),
+      contentEnd.trimRight(),
       '',
     ].join('\n');
 

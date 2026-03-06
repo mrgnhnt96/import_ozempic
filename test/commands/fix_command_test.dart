@@ -60,6 +60,93 @@ void main() {
       });
     });
 
+    group('#removeDartFormatCommentsBetweenParts', () {
+      test('should remove // dart format on between parts', () {
+        final lines = [
+          "part 'part_a.dart';",
+          "// dart format on",
+          "part 'part_b.dart';",
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(result, "part 'part_a.dart';\npart 'part_b.dart';");
+      });
+
+      test('should remove // dart format on with line breaks before and after',
+          () {
+        final lines = [
+          "part 'part_a.dart';",
+          '',
+          '',
+          "// dart format on",
+          '',
+          '',
+          "part 'part_b.dart';",
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(result, "part 'part_a.dart';\npart 'part_b.dart';");
+      });
+
+      test('should remove // dart format off between parts', () {
+        final lines = [
+          "part 'part_a.dart';",
+          "// dart format off",
+          "part 'part_b.dart';",
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(result, "part 'part_a.dart';\npart 'part_b.dart';");
+      });
+
+      test('should remove both format comments with blanks between parts', () {
+        final lines = [
+          "part 'part_a.dart';",
+          '',
+          "// dart format off",
+          '',
+          "// dart format on",
+          '',
+          "part 'part_b.dart';",
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(result, "part 'part_a.dart';\npart 'part_b.dart';");
+      });
+
+      test('should keep format comment when not between parts', () {
+        final lines = [
+          "part 'part_a.dart';",
+          '',
+          "// dart format on",
+          '',
+          "void main() {}",
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(
+          result,
+          "part 'part_a.dart';\n\n// dart format on\n\nvoid main() {}",
+        );
+      });
+
+      test('should preserve content after last part', () {
+        final lines = [
+          "part 'part_a.dart';",
+          "// dart format on",
+          "part 'part_b.dart';",
+          '',
+          'void main() {}',
+        ];
+        final result =
+            FixCommand.removeDartFormatCommentsBetweenParts(lines);
+        expect(
+          result,
+          "part 'part_a.dart';\npart 'part_b.dart';\n\nvoid main() {}",
+        );
+      });
+    });
+
     group('#getParts', () {
       testScoped(
         'should find all parts when comments appear between part directives',
@@ -454,6 +541,92 @@ void main() {}
 ''');
         },
       );
+      testScoped(
+        'should remove dart format comment between part directives',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+import 'package:foo/bar.dart';
+part 'part_a.dart';
+// dart format on
+part 'part_b.dart';
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:foo/bar.dart'),
+                associatedElement: _FakeElement(displayName: 'Foo'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(
+            reference,
+            config: Config(format: true),
+          );
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+import 'package:foo/bar.dart' show Foo;
+
+part 'part_a.dart';
+part 'part_b.dart';
+
+void main() {}
+''');
+        },
+      );
+
+      testScoped(
+        'should remove dart format comment and line breaks between part directives',
+        fileSystem: () => memoryFs,
+        cwd: () => memoryFs.currentDirectory.path,
+        () {
+          write('''
+import 'package:foo/bar.dart';
+part 'part_a.dart';
+
+// dart format on
+
+part 'part_b.dart';
+
+void main() {}
+''');
+
+          final reference = ResolvedReferences(
+            path: path,
+            references: [
+              Reference(
+                lib: _FakeLibrary(uri: 'package:foo/bar.dart'),
+                associatedElement: _FakeElement(displayName: 'Foo'),
+              ),
+            ],
+          );
+
+          command.updateImportStatements(
+            reference,
+            config: Config(format: true),
+          );
+
+          final content = memoryFs.file(path).readAsStringSync();
+
+          expect(content, '''
+import 'package:foo/bar.dart' show Foo;
+
+part 'part_a.dart';
+part 'part_b.dart';
+
+void main() {}
+''');
+        },
+      );
+
       testScoped(
         'should keep top level comments',
         fileSystem: () => memoryFs,
