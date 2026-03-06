@@ -67,9 +67,10 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
           Reference(lib: element.library, associatedElement: element),
         );
 
-      // Example: `Foo`, `List<Bar>`
+      // Example: `Foo`, `List<Bar>`. Prefer type alias when present (e.g.
+      // DioMediaType over MediaType) so we import the name the user wrote.
       case NamedType(
-        type: InterfaceType(:final element),
+        type: InterfaceType(:final element, :final alias),
         :final typeArguments,
         :final importPrefix,
       ):
@@ -78,12 +79,12 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
           _ => null,
         };
 
+        final (lib, elem) = alias != null
+            ? (alias.element.library, alias.element as Element)
+            : (element.library, element);
+
         _addReference(
-          Reference(
-            lib: element.library,
-            associatedElement: element,
-            prefix: prefix,
-          ),
+          Reference(lib: lib, associatedElement: elem, prefix: prefix),
         );
 
         if (typeArguments?.arguments case final args?) {
@@ -268,12 +269,23 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
               );
             }
           case ClassElement(:final thisType):
+            // Prefer the type alias's library when user wrote Alias.staticMethod()
+            // (e.g. DioMediaType.parse())—alias is defined in dio, underlying
+            // MediaType in http_parser; user needs dio import, not http_parser.
+            var lib = thisType.element.library;
+            var elem = thisType.element as Element;
+            if (node.target case SimpleIdentifier(:final element?)) {
+              if (element is TypeAliasElement) {
+                final aliased = element.aliasedType;
+                if (aliased is InterfaceType &&
+                    aliased.element == thisType.element) {
+                  lib = element.library;
+                  elem = element;
+                }
+              }
+            }
             _addReference(
-              Reference(
-                lib: thisType.element.library,
-                associatedElement: thisType.element,
-                prefix: prefix,
-              ),
+              Reference(lib: lib, associatedElement: elem, prefix: prefix),
             );
           case EnumElement(:final instantiate):
             final type = instantiate(
@@ -292,6 +304,40 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
     }
 
     super.visitMethodInvocation(node);
+  }
+
+  @override
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    // Explicitly handle constructor calls (e.g. in initializer lists, part files).
+    // visitNamedType may miss these when type resolution differs in part files.
+    // Prefer type alias when user wrote Alias() (e.g. SegmentTabController())
+    // over the underlying class (TabController).
+    switch (node.staticType) {
+      case InterfaceType(:final element):
+        if (element.name case 'Future' || 'Stream') break;
+        var lib = element.library;
+        var elem = element as Element;
+        final type = node.constructorName.type;
+        final typeElem = type.element;
+        if (typeElem case TypeAliasElement()) {
+          final aliased = typeElem.aliasedType;
+          if (aliased is InterfaceType && aliased.element == element) {
+            lib = typeElem.library;
+            elem = typeElem;
+          }
+        }
+        _addReference(
+          Reference(
+            lib: lib,
+            associatedElement: elem,
+            prefix: type.importPrefix?.name.lexeme,
+          ),
+        );
+      case _:
+        break;
+    }
+
+    super.visitInstanceCreationExpression(node);
   }
 
   @override

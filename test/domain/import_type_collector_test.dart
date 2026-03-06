@@ -132,6 +132,70 @@ void main() {
     );
 
     testScoped(
+      'should prefer type alias over underlying class for constructor calls',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        // HeroOfTime() resolves to User() - should import HeroOfTime (alias),
+        // not User (avoids unused TabController-style imports).
+        final results = await analyzer.analyze([
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'named_type',
+            'type_alias_constructor.dart',
+          ),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final references = collector.references;
+
+        expect(references, hasLength(1));
+        expect(
+          references.single.import,
+          Import('package:_extensions/ext/user_type_alias.dart'),
+        );
+        expect(references.single.associatedElement?.displayName, 'HeroOfTime');
+      },
+    );
+
+    testScoped(
+      'should prefer type alias over underlying class for static method calls',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        // DioMediaType.parse() resolves to MediaType.parse() - should import
+        // DioMediaType (alias), not MediaType (avoids unused http_parser import).
+        final results = await analyzer.analyze([
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'named_type',
+            'type_alias_static_method.dart',
+          ),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final references = collector.references;
+
+        expect(references, hasLength(1));
+        expect(
+          references.single.import,
+          Import('package:_extensions/ext/media_type_alias.dart'),
+        );
+        expect(references.single.associatedElement?.displayName, 'DioMediaType');
+      },
+    );
+
+    testScoped(
       'should get general types',
       cwd: () => cwd(fs),
       initializeAnalyzer: true,

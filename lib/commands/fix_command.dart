@@ -332,7 +332,6 @@ class FixCommand {
 
       library.unit.accept(collector);
     }
-
     return resolvedImport..addAll(collector.references);
   }
 
@@ -418,6 +417,7 @@ class FixCommand {
     for (var i = startIndex; i < lines.length; i++) {
       final trimmed = lines[i].trim();
       if (trimmed.isEmpty) continue;
+      if (trimmed.startsWith('//')) continue;
 
       if (!trimmed.startsWith('part')) break;
 

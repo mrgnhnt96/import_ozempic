@@ -1,6 +1,8 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:file/memory.dart';
 import 'package:import_ozempic/commands/fix_command.dart';
+import 'package:import_ozempic/deps/analyzer.dart';
+import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/domain/config.dart';
 import 'package:import_ozempic/domain/reference.dart';
@@ -27,20 +29,23 @@ void main() {
 
   group(FixCommand, () {
     group('#findImportBlockIndices', () {
-      test('should find index after import block with multi-line show/hide', () {
-        final lines = [
-          "library foo;",
-          "import 'package:a.dart'",
-          "    show",
-          "        Foo,",
-          "        Bar;",
-          "part 'data/__post_data.dart';",
-          "class MyClass {}",
-        ];
-        final result = FixCommand.findImportBlockIndices(lines);
-        expect(result.importStart, 1);
-        expect(result.importEnd, 5); // Index of first part line
-      });
+      test(
+        'should find index after import block with multi-line show/hide',
+        () {
+          final lines = [
+            "library foo;",
+            "import 'package:a.dart'",
+            "    show",
+            "        Foo,",
+            "        Bar;",
+            "part 'data/__post_data.dart';",
+            "class MyClass {}",
+          ];
+          final result = FixCommand.findImportBlockIndices(lines);
+          expect(result.importStart, 1);
+          expect(result.importEnd, 5); // Index of first part line
+        },
+      );
 
       test('should find index when parts follow imports', () {
         final lines = [
@@ -53,6 +58,32 @@ void main() {
         expect(result.importStart, 0);
         expect(result.importEnd, 1); // Index of first part line
       });
+    });
+
+    group('#getParts', () {
+      testScoped(
+        'should find all parts when comments appear between part directives',
+        cwd: () => fs.path.join(fs.currentDirectory.path, 'test', 'fixtures'),
+        initializeAnalyzer: true,
+        () async {
+          final results = await analyzer.analyze([
+            fs.path.join(
+              fs.currentDirectory.path,
+              'test',
+              'fixtures',
+              'lib',
+              'inputs',
+              'file_with_comment_between_parts.dart',
+            ),
+          ]);
+
+          final parts = command.getParts(results.single.$1);
+
+          expect(parts, hasLength(2));
+          expect(parts[0], endsWith('part_a.dart'));
+          expect(parts[1], endsWith('part_b.dart'));
+        },
+      );
     });
 
     group('#updateImportStatements', () {
@@ -303,11 +334,16 @@ void main() {}
             path: path,
             references: [
               Reference(
-                lib: _FakeLibrary(uri: 'package:couchsurfing_application/blocs/community_bloc.dart'),
+                lib: _FakeLibrary(
+                  uri:
+                      'package:couchsurfing_application/blocs/community_bloc.dart',
+                ),
                 associatedElement: _FakeElement(displayName: 'CommunityBloc'),
               ),
               Reference(
-                lib: _FakeLibrary(uri: 'package:couchsurfing_application/blocs/post_bloc.dart'),
+                lib: _FakeLibrary(
+                  uri: 'package:couchsurfing_application/blocs/post_bloc.dart',
+                ),
                 associatedElement: _FakeElement(displayName: 'PostBloc'),
               ),
             ],
