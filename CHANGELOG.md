@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.0.18 | 3.6.26
+
+- Fix part file detection to skip comment lines between part directives, so parts after `// dart format on` (or similar) are no longer missed
+- Prefer type alias over underlying class when collecting imports—use the alias the user wrote (e.g. `SegmentTabController`, `DioMediaType`) instead of the canonical type (`TabController`, `MediaType`), avoiding unused imports from constructor calls, static method calls, and type annotations
+
 ## 0.0.17 | 2.10.26
 
 - Fix import parsing to correctly handle multi-line `show` and `hide` clauses that span multiple lines until the terminating semicolon
