@@ -5,6 +5,7 @@ import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/domain/import.dart';
 import 'package:import_ozempic/domain/import_type_collector.dart';
+import 'package:import_ozempic/domain/resolved_references.dart';
 import 'package:test/test.dart';
 
 import '../utils/test_scoped.dart';
@@ -389,6 +390,39 @@ void main() {
 
         expect(user.import, Import('package:_extensions/domain/user.dart'));
         expect(user.prefix, '_user');
+      },
+    );
+
+    testScoped(
+      'doc [Subclass.method] should not import declaring superclass',
+      cwd: () => cwd(fs),
+      initializeAnalyzer: true,
+      () async {
+        final results = await analyzer.analyze([
+          fs.path.join(
+            cwd(fs),
+            'lib',
+            'inputs',
+            'doc_comment_subclass_method.dart',
+          ),
+        ]);
+
+        final lib = await (results.single.$2)();
+
+        lib.unit.accept(collector);
+
+        final resolved = ResolvedReferences(path: lib.path)
+          ..addAll(collector.references);
+
+        expect(
+          resolved.references
+              .map((r) => r.import.toString())
+              .where((uri) => uri.contains('coordinator_core')),
+          isEmpty,
+          reason:
+              'doc link should use the subclass in the comment, not the superclass '
+              'that declares the method',
+        );
       },
     );
   });

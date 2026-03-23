@@ -399,9 +399,12 @@ class ImportTypeCollector extends RecursiveAstVisitor<void> {
   void visitComment(Comment node) {
     // Handles `/// [TypeName]` doc comment references
     for (final ref in node.references) {
+      // For `[Subclass.method]` the analyzer binds the method to its declaring
+      // class (often a superclass). Use the written prefix type (`Subclass`)
+      // so we do not add imports for supertypes the source never names.
       final element = switch (ref.expression) {
         SimpleIdentifier(:final element) => element,
-        PrefixedIdentifier(:final element) => element?.enclosingElement,
+        PrefixedIdentifier(prefix: SimpleIdentifier(:final element)) => element,
         _ => null,
       };
 

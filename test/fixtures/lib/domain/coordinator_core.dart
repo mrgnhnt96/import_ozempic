@@ -1,0 +1,3 @@
+class CoordinatorCore {
+  void push() {}
+}
