@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.0.19 | 3.23.26
+
+- Fix doc comment references like `[Subclass.inheritedMethod]`: resolve the type written before the dot (the subclass) instead of the declaring superclass of the method
+
 ## 0.0.18 | 3.6.26
 
 - Fix part file detection to skip comment lines between part directives, so parts after `// dart format on` (or similar) are no longer missed
