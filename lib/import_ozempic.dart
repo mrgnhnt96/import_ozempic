@@ -1,5 +1,6 @@
 import 'package:import_ozempic/commands/fix_command.dart';
 import 'package:import_ozempic/commands/restore_command.dart';
+import 'package:import_ozempic/commands/sober_command.dart';
 import 'package:import_ozempic/commands/update_command.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/args.dart';
@@ -12,6 +13,7 @@ Usage: import_ozempic <command> <arguments>
 
 Commands:
   fix <files...>   Fix the imports in the given files
+  sober <files...> Collapse granular imports to barrel exports when available
   update           Update the package to the latest version
   restore          Restore the analysis options files to their original location
 
@@ -34,6 +36,8 @@ class ImportOzempic {
           switch (args.path) {
             case ['fix', ...final files]:
               exitCode = await FixCommand(args: args).run(files);
+            case ['sober', ...final files]:
+              exitCode = await SoberCommand(args: args).run(files);
             case ['update']:
               return exitCode = await UpdateCommand(args: args).run();
             case ['restore']:

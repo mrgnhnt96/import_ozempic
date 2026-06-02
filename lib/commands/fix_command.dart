@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
@@ -6,10 +7,13 @@ import 'package:import_ozempic/deps/fs.dart';
 import 'package:import_ozempic/deps/log.dart';
 import 'package:import_ozempic/deps/process.dart';
 import 'package:import_ozempic/domain/args.dart';
+import 'package:import_ozempic/domain/barrel_import_cache.dart';
 import 'package:import_ozempic/domain/config.dart';
+import 'package:import_ozempic/domain/import_style.dart';
 import 'package:import_ozempic/domain/import_type_collector.dart';
 import 'package:import_ozempic/domain/resolved_references.dart';
 import 'package:meta/meta.dart';
+import 'package:package_config/package_config.dart';
 
 const _usage = '''
 Usage: import_ozempic fix <files...> [--config <path>]
@@ -18,9 +22,10 @@ Formats and fixes import statements in the specified Dart file(s), removing unus
 ''';
 
 class FixCommand {
-  const FixCommand({required this.args});
+  const FixCommand({required this.args, this.style = ImportStyle.granular});
 
   final Args args;
+  final ImportStyle style;
 
   Config get config =>
       switch (args.getOrNull('config') ?? args.getOrNull('c')) {
@@ -94,6 +99,8 @@ class FixCommand {
 
     await analyzer.initialize(root: root);
 
+    final packageConfig = await findPackageConfig(Directory(root));
+
     final results = await analyzer.analyze(cleanedFiles);
     log.debug('Analyzed (${results.length} results)');
 
@@ -134,9 +141,21 @@ class FixCommand {
 
     log('Resolving imports:');
     for (final lib in libraries) {
+      final resolved = await _resolveReferences(lib);
+      final (_, resolveFn) = lib;
+      final unit = await resolveFn();
+      final barrelCache = style == ImportStyle.barrel
+          ? await BarrelImportCache.build(
+              references: resolved.references,
+              packageConfig: packageConfig,
+              session: unit.session,
+            )
+          : const BarrelImportCache.empty();
+
       await updateImportStatements(
-        await _resolveReferences(lib),
+        resolved,
         config: config,
+        barrelCache: barrelCache,
       );
     }
 
@@ -273,6 +292,7 @@ class FixCommand {
   Future<void> updateImportStatements(
     ResolvedReferences import, {
     Config? config,
+    BarrelImportCache barrelCache = const BarrelImportCache.empty(),
   }) async {
     final _config = config ?? Config();
     final ResolvedReferences(:path, :imports, :hasImports) = import;
@@ -306,6 +326,8 @@ class FixCommand {
 
     final (:dart, :relative, :package) = imports(
       trailComments: !_config.format,
+      style: style,
+      barrelCache: barrelCache,
     );
 
     final importStatements = [

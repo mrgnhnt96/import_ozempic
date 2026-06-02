@@ -1,4 +1,6 @@
+import 'package:import_ozempic/domain/barrel_import_cache.dart';
 import 'package:import_ozempic/domain/import.dart';
+import 'package:import_ozempic/domain/import_style.dart';
 import 'package:import_ozempic/domain/reference.dart';
 import 'package:import_ozempic/domain/resolved_import.dart';
 
@@ -21,7 +23,11 @@ class ResolvedReferences {
     List<ResolvedImport> relative,
     List<ResolvedImport> package,
   })
-  imports({bool trailComments = true}) {
+  imports({
+    bool trailComments = true,
+    ImportStyle style = ImportStyle.granular,
+    BarrelImportCache barrelCache = const BarrelImportCache.empty(),
+  }) {
     final path = this.path;
 
     if (path == null) {
@@ -31,7 +37,11 @@ class ResolvedReferences {
     final imports = <String, Reference>{};
 
     for (final ref in references) {
-      final import = ref.import.resolved(path);
+      final import = ref.resolvedImportUri(
+        path,
+        style: style,
+        barrelCache: barrelCache,
+      );
       if (import == null) {
         continue;
       }
@@ -42,6 +52,11 @@ class ResolvedReferences {
       };
 
       if (imports.remove(key) case final Reference existing) {
+        if (style == ImportStyle.barrel) {
+          imports[key] = existing;
+          continue;
+        }
+
         if (existing.canJoin(ref)) {
           imports[key] = existing.join(ref);
         } else {
@@ -71,6 +86,8 @@ class ResolvedReferences {
       final resolved = ref.importStatement(
         path,
         includeIgnores: !trailComments,
+        style: style,
+        barrelCache: barrelCache,
       );
       if (resolved == null) continue;
 

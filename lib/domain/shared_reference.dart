@@ -1,5 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'package:import_ozempic/domain/barrel_import_cache.dart';
 import 'package:import_ozempic/domain/import.dart';
+import 'package:import_ozempic/domain/import_style.dart';
 import 'package:import_ozempic/domain/reference.dart';
 
 mixin SharedReference {
@@ -49,27 +51,60 @@ mixin SharedReference {
   }
 
   /// [includeIgnores] will add any ignore comments to above any `show` combinator
-  String? importStatement(String path, {bool includeIgnores = false}) {
+  String? importStatement(
+    String path, {
+    bool includeIgnores = false,
+    ImportStyle style = ImportStyle.granular,
+    BarrelImportCache barrelCache = const BarrelImportCache.empty(),
+  }) {
     if (optional) {
       return null;
     }
 
+    var import = this.import.resolved(path);
+    if (import == null) {
+      return null;
+    }
+
+    var usesBarrel = false;
+    if (style == ImportStyle.barrel && Import(import).isPackage) {
+      final barrel = barrelCache.resolve(import, associatedElement);
+      if (barrel != null) {
+        import = barrel;
+        usesBarrel = true;
+      }
+    }
+
+    final show = usesBarrel
+        ? null
+        : showCombinator(includeIgnores: includeIgnores);
+
+    final statement = [
+      'import',
+      "'$import'",
+      if (prefix case final String prefix) 'as $prefix',
+      if (show case final String combinator) combinator,
+    ].join(' ').trim();
+
+    return '$statement;';
+  }
+
+  /// Resolves the import URI used for grouping and writing import statements.
+  String? resolvedImportUri(
+    String path, {
+    ImportStyle style = ImportStyle.granular,
+    BarrelImportCache barrelCache = const BarrelImportCache.empty(),
+  }) {
     final import = this.import.resolved(path);
     if (import == null) {
       return null;
     }
 
-    final statement = [
-      'import',
-      "'$import'",
-      // if (hideCombinator case final String combinator) combinator,
-      if (prefix case final String prefix) 'as $prefix',
-      if (showCombinator(includeIgnores: includeIgnores)
-          case final String combinator)
-        combinator,
-    ].join(' ').trim();
-
-    return '$statement;';
+    return switch (style) {
+      ImportStyle.granular => import,
+      ImportStyle.barrel =>
+        barrelCache.resolve(import, associatedElement) ?? import,
+    };
   }
 
   List<String>? get ignores;
