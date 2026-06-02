@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.0.20 | 6.2.26
+
+- Add `sober` command to collapse granular package imports back to barrel exports (`package:name/name.dart`) when the barrel file exists on disk
+- Refactor `fix` command to support granular and barrel import styles
+
 ## 0.0.19 | 3.23.26
 
 - Fix doc comment references like `[Subclass.inheritedMethod]`: resolve the type written before the dot (the subclass) instead of the declaring superclass of the method
