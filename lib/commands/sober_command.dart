@@ -7,6 +7,7 @@ Usage: import_ozempic sober <files...> [--config <path>]
 
 Collapses granular package imports back to barrel exports
 (`package:<name>/<name>.dart`) when the barrel file exists on disk.
+Use `fix` for the inverse (granular source files with show combinators).
 ''';
 
 class SoberCommand extends FixCommand {

@@ -12,7 +12,7 @@ const _usage = '''
 Usage: import_ozempic <command> <arguments>
 
 Commands:
-  fix <files...>   Fix the imports in the given files
+  fix <files...>   Resolve imports to granular source files with show combinators
   sober <files...> Collapse granular imports to barrel exports when available
   update           Update the package to the latest version
   restore          Restore the analysis options files to their original location

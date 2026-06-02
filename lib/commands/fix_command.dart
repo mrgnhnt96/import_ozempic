@@ -18,7 +18,9 @@ import 'package:package_config/package_config.dart';
 const _usage = '''
 Usage: import_ozempic fix <files...> [--config <path>]
 
-Formats and fixes import statements in the specified Dart file(s), removing unused imports and normalizing import order and style.
+Formats and fixes import statements in the specified Dart file(s), removing
+unused imports and resolving package imports to granular source files with
+`show` combinators. Use `sober` for the inverse (barrel exports).
 ''';
 
 class FixCommand {

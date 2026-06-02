@@ -13,6 +13,8 @@ Is your codebase carrying extra weight from bloated import statements? Time for 
   2. Package imports (`package:*`)
   3. Relative imports
 - **Unused Import Removal**: Cuts out the excess—detects and removes unused imports that are just adding bulk
+- **Granular Import Resolution**: The `fix` command resolves package imports to their source library with precise `show` combinators
+- **Barrel Import Consolidation**: The `sober` command collapses granular imports back to barrel exports (`package:name/name.dart`) when the barrel file exists on disk
 - **Multi-file Processing**: Process individual files, multiple files, or give your entire directory a complete makeover
 - **Configurable Exclusions**: Some files are already perfect (like generated files)—exclude what you want to keep as-is
 - **Part File Support**: Correctly handles Dart libraries with part files—no side effects!
@@ -35,6 +37,13 @@ dart pub global activate import_ozempic
 ```
 
 ## Usage
+
+`import_ozempic` provides two complementary commands for managing imports:
+
+- **`fix`** — resolves package imports to granular source files with `show` combinators (the default transformation)
+- **`sober`** — collapses granular imports back to barrel exports when a barrel file exists on disk
+
+Both commands accept the same arguments: one or more files/directories, and an optional `--config` path.
 
 ### Basic Usage
 
@@ -68,6 +77,23 @@ Go for the full transformation—fix an entire directory:
 import_ozempic fix .
 ```
 
+### Sober (Barrel Imports)
+
+Need to consolidate granular imports back into barrel exports? The `sober` command is the inverse of `fix`:
+
+```bash
+import_ozempic sober lib/main.dart
+```
+
+Process multiple files or an entire directory:
+
+```bash
+import_ozempic sober lib/main.dart lib/utils.dart
+import_ozempic sober .
+```
+
+Sober only collapses an import when a barrel file on disk exports the referenced type. Imports with no matching barrel export are left unchanged.
+
 ### With Configuration
 
 Want a personalized treatment plan? Create a configuration file (e.g., `import_cleaner.yaml`):
@@ -83,6 +109,7 @@ Then run with the config:
 
 ```bash
 import_ozempic fix . --config import_cleaner.yaml
+import_ozempic sober . --config import_cleaner.yaml
 ```
 
 ## Configuration
@@ -123,7 +150,8 @@ The secret formula for healthy imports:
 2. **Reference Collection**: Traverses the AST to collect all type references (checking vital signs)
 3. **Import Resolution**: Determines which imports are actually needed (diagnosis)
 4. **Organization**: Rewrites import statements in the correct order with proper grouping (the treatment)
-5. **Cleanup**: Runs `dart fix` to remove unused imports and fix related warnings (follow-up care)
+5. **Style**: `fix` resolves to granular source imports; `sober` collapses back to barrel exports when available
+6. **Cleanup**: Runs `dart fix` to remove unused imports and fix related warnings (follow-up care)
 
 ## Example
 
@@ -159,6 +187,19 @@ import 'package:select_when/src/select_when_context.dart' show SelectWhenContext
 ```
 
 Notice how we've eliminated the unnecessary bloat and only import exactly what you need. Your imports just got a lot healthier!
+
+Running `sober` on the result above (when `package:project_domain/project_domain.dart` exports those types) would collapse the granular imports back to:
+
+```dart
+import 'dart:async' show Completer;
+
+import 'package:project_domain/project_domain.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:formz/formz.dart';
+import 'package:provider/provider.dart';
+import 'package:select_when/select_when.dart';
+```
 
 ## Requirements
 
