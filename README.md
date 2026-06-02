@@ -14,7 +14,7 @@ Is your codebase carrying extra weight from bloated import statements? Time for 
   3. Relative imports
 - **Unused Import Removal**: Cuts out the excess—detects and removes unused imports that are just adding bulk
 - **Granular Import Resolution**: The `fix` command resolves package imports to their source library with precise `show` combinators
-- **Barrel Import Consolidation**: The `sober` command collapses granular imports back to barrel exports (`package:name/name.dart`) when the barrel file exists on disk
+- **Barrel Import Consolidation**: The `sober` command collapses granular imports back to barrel exports (`package:name/name.dart`) when the barrel file exists on disk—especially useful when updating dependencies, since barrel exports stay stable even when a package reorganizes its internal `src` paths
 - **Multi-file Processing**: Process individual files, multiple files, or give your entire directory a complete makeover
 - **Configurable Exclusions**: Some files are already perfect (like generated files)—exclude what you want to keep as-is
 - **Part File Support**: Correctly handles Dart libraries with part files—no side effects!
@@ -41,7 +41,7 @@ dart pub global activate import_ozempic
 `import_ozempic` provides two complementary commands for managing imports:
 
 - **`fix`** — resolves package imports to granular source files with `show` combinators (the default transformation)
-- **`sober`** — collapses granular imports back to barrel exports when a barrel file exists on disk
+- **`sober`** — collapses granular imports back to barrel exports when a barrel file exists on disk; handy before or after dependency updates, when packages may move or rename internal source files
 
 Both commands accept the same arguments: one or more files/directories, and an optional `--config` path.
 
@@ -93,6 +93,8 @@ import_ozempic sober .
 ```
 
 Sober only collapses an import when a barrel file on disk exports the referenced type. Imports with no matching barrel export are left unchanged.
+
+Granular imports from `fix` point at a package's internal source files (e.g. `package:foo/src/widgets/button.dart`). Those paths can break when you bump a dependency and the package reshuffles its layout. Barrel exports (`package:foo/foo.dart`) are part of the public API and tend to survive those changes—run `sober` before updating packages to make your imports more resilient, or after an update if granular paths no longer resolve.
 
 ### With Configuration
 

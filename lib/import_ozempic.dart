@@ -13,7 +13,7 @@ Usage: import_ozempic <command> <arguments>
 
 Commands:
   fix <files...>   Resolve imports to granular source files with show combinators
-  sober <files...> Collapse granular imports to barrel exports when available
+  sober <files...> Collapse granular imports to barrel exports (stable across package updates)
   update           Update the package to the latest version
   restore          Restore the analysis options files to their original location
 
