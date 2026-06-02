@@ -121,7 +121,7 @@ void main() {}
         fs.directory(fs.path.joinAll(['test', 'fixtures'])).path;
 
     testScoped(
-      'uses sibling barrel when it exports the referenced type',
+      'consolidates to package barrel when it re-exports all referenced types',
       cwd: () => fixturesRoot(),
       initializeAnalyzer: true,
       () async {
@@ -131,40 +131,45 @@ void main() {}
           'inputs',
           'bloc.dart',
         );
+        final inputFile = fs.file(inputPath);
+        final originalContent = inputFile.readAsStringSync();
+        try {
+          final results = await analyzer.analyze([inputPath]);
+          final (parsed, resolved) = results.single;
+          final library = await resolved();
 
-        final results = await analyzer.analyze([inputPath]);
-        final (parsed, resolved) = results.single;
-        final library = await resolved();
+          final collector = ImportTypeCollector();
+          library.unit.accept(collector);
 
-        final collector = ImportTypeCollector();
-        library.unit.accept(collector);
+          final references = ResolvedReferences(path: parsed.path)
+            ..addAll(collector.references);
 
-        final references = ResolvedReferences(path: parsed.path)
-          ..addAll(collector.references);
+          final packageConfig = await findPackageConfig(
+            Directory(fixturesRoot()),
+          );
 
-        final packageConfig = await findPackageConfig(
-          Directory(fixturesRoot()),
-        );
+          final barrelCache = await BarrelImportCache.build(
+            references: references.references,
+            packageConfig: packageConfig,
+            session: library.session,
+          );
 
-        final barrelCache = await BarrelImportCache.build(
-          references: references.references,
-          packageConfig: packageConfig,
-          session: library.session,
-        );
+          await command.updateImportStatements(
+            references,
+            barrelCache: barrelCache,
+          );
 
-        await command.updateImportStatements(
-          references,
-          barrelCache: barrelCache,
-        );
+          final content = fs.file(inputPath).readAsStringSync();
 
-        final content = fs.file(inputPath).readAsStringSync();
-
-        expect(content, contains("import 'package:_extensions/widgets.dart';"));
-        expect(
-          content,
-          contains("import 'package:_extensions/_extensions.dart';"),
-        );
-        expect(content, isNot(contains(' show ')));
+          expect(
+            content,
+            contains("import 'package:_extensions/_extensions.dart';"),
+          );
+          expect(content, isNot(contains('widgets.dart')));
+          expect(content, isNot(contains(' show ')));
+        } finally {
+          File(inputFile.path).writeAsStringSync(originalContent);
+        }
       },
     );
 
@@ -179,39 +184,44 @@ void main() {}
           'inputs',
           'multi_barrel.dart',
         );
+        final inputFile = fs.file(inputPath);
+        final originalContent = inputFile.readAsStringSync();
+        try {
+          final results = await analyzer.analyze([inputPath]);
+          final (parsed, resolved) = results.single;
+          final library = await resolved();
 
-        final results = await analyzer.analyze([inputPath]);
-        final (parsed, resolved) = results.single;
-        final library = await resolved();
+          final collector = ImportTypeCollector();
+          library.unit.accept(collector);
 
-        final collector = ImportTypeCollector();
-        library.unit.accept(collector);
+          final references = ResolvedReferences(path: parsed.path)
+            ..addAll(collector.references);
 
-        final references = ResolvedReferences(path: parsed.path)
-          ..addAll(collector.references);
+          final packageConfig = await findPackageConfig(
+            Directory(fixturesRoot()),
+          );
 
-        final packageConfig = await findPackageConfig(
-          Directory(fixturesRoot()),
-        );
+          final barrelCache = await BarrelImportCache.build(
+            references: references.references,
+            packageConfig: packageConfig,
+            session: library.session,
+          );
 
-        final barrelCache = await BarrelImportCache.build(
-          references: references.references,
-          packageConfig: packageConfig,
-          session: library.session,
-        );
+          await command.updateImportStatements(
+            references,
+            barrelCache: barrelCache,
+          );
 
-        await command.updateImportStatements(
-          references,
-          barrelCache: barrelCache,
-        );
+          final content = fs.file(inputPath).readAsStringSync();
 
-        final content = fs.file(inputPath).readAsStringSync();
-
-        expect(content, contains("import 'package:_extensions/widgets.dart';"));
-        expect(content, contains("import 'package:_extensions/theme.dart';"));
-        expect(content, isNot(contains('foundation.dart')));
-        expect(content, isNot(contains('theme_only.dart')));
-        expect(content, isNot(contains(' show ')));
+          expect(content, contains("import 'package:_extensions/widgets.dart';"));
+          expect(content, contains("import 'package:_extensions/theme.dart';"));
+          expect(content, isNot(contains('foundation.dart')));
+          expect(content, isNot(contains('theme_only.dart')));
+          expect(content, isNot(contains(' show ')));
+        } finally {
+          File(inputFile.path).writeAsStringSync(originalContent);
+        }
       },
     );
   });

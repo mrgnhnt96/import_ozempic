@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file/file.dart';
 import 'package:import_ozempic/deps/analyzer.dart';
 import 'package:import_ozempic/deps/find.dart';
@@ -12,7 +14,7 @@ import 'package:test/test.dart';
 @isTest
 void testScoped(
   String description,
-  void Function() fn, {
+  FutureOr<void> Function() fn, {
   FileSystem Function()? fileSystem,
   String Function()? cwd,
   bool initializeAnalyzer = false,
@@ -37,7 +39,7 @@ void testScoped(
         );
       }
 
-      fn();
+      await fn();
     });
   });
 }
