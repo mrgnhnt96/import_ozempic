@@ -7,6 +7,10 @@ install:
     - dart pub get
     - dart pub global activate --source path . --overwrite
 
+compile:
+  (aliases): aot
+  (command): dart compile exe bin/import_ozempic.dart -o build/import_ozempic
+
 lint: dart analyze . --fatal-infos --fatal-warnings
 
 publish:
