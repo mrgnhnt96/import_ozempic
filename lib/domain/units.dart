@@ -3,11 +3,16 @@ import 'package:analyzer/dart/analysis/results.dart';
 
 class Units {
   Units({required AnalysisContext context, required String path})
-    : _resolved = context.currentSession.getResolvedUnit(path),
+    : _context = context,
+      _path = path,
       _parsed = context.currentSession.getParsedUnit(path);
 
-  final Future<SomeResolvedUnitResult> _resolved;
+  final AnalysisContext _context;
+  final String _path;
   final SomeParsedUnitResult _parsed;
+
+  /// Lazily started so callers can filter with parse-only results first.
+  Future<SomeResolvedUnitResult>? _resolvedFuture;
 
   ParsedUnitResult get parsed {
     if (_parsed case final ParsedUnitResult parsed) {
@@ -23,7 +28,8 @@ class Units {
       return resolved;
     }
 
-    final result = await _resolved;
+    _resolvedFuture ??= _context.currentSession.getResolvedUnit(_path);
+    final result = await _resolvedFuture!;
 
     if (result is! ResolvedUnitResult) {
       throw ArgumentError('Could not resolve unit: $result');

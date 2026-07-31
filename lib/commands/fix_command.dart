@@ -103,7 +103,10 @@ class FixCommand {
 
     final packageConfig = await findPackageConfig(Directory(root));
 
-    final results = await analyzer.analyze(cleanedFiles);
+    final results = await analyzer.analyze(
+      cleanedFiles,
+      skipInDirectory: config.shouldExclude,
+    );
     log.debug('Analyzed (${results.length} results)');
 
     final libraries =
@@ -142,26 +145,34 @@ class FixCommand {
     }
 
     log('Resolving imports:');
-    for (final lib in libraries) {
-      final resolved = await _resolveReferences(lib);
-      final (_, resolveFn) = lib;
-      final unit = await resolveFn();
-      final barrelCache = style == ImportStyle.barrel
-          ? await BarrelImportCache.build(
-              references: resolved.references,
-              packageConfig: packageConfig,
-              session: unit.session,
-            )
-          : const BarrelImportCache.empty();
-
-      await updateImportStatements(
-        resolved,
-        config: config,
-        barrelCache: barrelCache,
-      );
-    }
+    await Future.wait([
+      for (final lib in libraries) _fixLibrary(lib, packageConfig, config),
+    ]);
 
     return null;
+  }
+
+  Future<void> _fixLibrary(
+    (ParsedUnitResult, Future<ResolvedUnitResult> Function()) lib,
+    PackageConfig? packageConfig,
+    Config config,
+  ) async {
+    final resolved = await _resolveReferences(lib);
+    final (_, resolveFn) = lib;
+    final unit = await resolveFn();
+    final barrelCache = style == ImportStyle.barrel
+        ? await BarrelImportCache.build(
+            references: resolved.references,
+            packageConfig: packageConfig,
+            session: unit.session,
+          )
+        : const BarrelImportCache.empty();
+
+    await updateImportStatements(
+      resolved,
+      config: config,
+      barrelCache: barrelCache,
+    );
   }
 
   /// Removes `// dart format on` and `// dart format off` lines that appear

@@ -6,7 +6,8 @@ import 'package:import_ozempic/deps/log.dart';
 import 'package:yaml/yaml.dart';
 
 class Config {
-  Config({this.exclude = const [], this.format = false});
+  Config({List<String>? exclude, this.format = false})
+    : exclude = exclude ?? defaultExclude;
 
   factory Config.load(String path) {
     final file = fs.file(path);
@@ -21,10 +22,11 @@ class Config {
     final yaml =
         jsonDecode(jsonEncode(loadYaml(content))) as Map<String, dynamic>;
 
+    final hasExcludeKey = yaml.containsKey('exclude');
     final exclude = switch (yaml['exclude']) {
       final String string => [string],
       final List<dynamic> list => list.map((e) => '$e').toList(),
-      _ => [],
+      _ => <String>[],
     };
 
     final format = switch (yaml['format']) {
@@ -34,8 +36,19 @@ class Config {
       _ => false,
     };
 
-    return Config(exclude: exclude as List<String>, format: format);
+    return Config(
+      exclude: hasExcludeKey ? exclude : null,
+      format: format,
+    );
   }
+
+  /// Generated / codegen outputs that should not be rewritten by default.
+  static const defaultExclude = [
+    '**/*.g.dart',
+    '**/*.freezed.dart',
+    '**/*.mocks.dart',
+    '**/*.config.dart',
+  ];
 
   final List<String> exclude;
 
