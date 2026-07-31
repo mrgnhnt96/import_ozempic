@@ -9,11 +9,13 @@ import 'package:import_ozempic/deps/log.dart';
 import 'package:import_ozempic/deps/platform.dart';
 import 'package:import_ozempic/deps/process.dart';
 import 'package:import_ozempic/deps/pub_updater.dart';
+import 'package:import_ozempic/domain/aot_bootstrap.dart';
 import 'package:import_ozempic/domain/args.dart';
 import 'package:import_ozempic/import_ozempic.dart';
 import 'package:scoped_deps/scoped_deps.dart';
 
 void main(List<String> arguments) async {
+  await maybeReexecAsAot(arguments);
   run(arguments);
 }
 

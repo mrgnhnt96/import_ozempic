@@ -20,6 +20,7 @@ Commands:
 
 Flags:
   --version        Print the version of the package
+  --recompile      Force rebuild of the cached native AOT binary
 ''';
 
 class ImportOzempic {
