@@ -36,6 +36,12 @@ Or activate it globally for quick access:
 dart pub global activate import_ozempic
 ```
 
+On first run, the CLI compiles a native binary into `~/.import_ozempic/aot/` and reuses it afterwards. Set `IOZ_NO_AOT=1` to stay on the Dart VM. Pass `--recompile` to force a fresh native build:
+
+```bash
+import_ozempic --recompile fix .
+```
+
 ## Usage
 
 `import_ozempic` provides two complementary commands for managing imports:
@@ -121,6 +127,18 @@ The configuration file supports the following options:
 ### `exclude`
 
 A list of file paths or glob patterns to exclude from processing. Think of these as the files that are already at their ideal weight!
+
+When omitted, generated/codegen outputs are excluded by default:
+
+```yaml
+exclude:
+  - "**/*.g.dart"
+  - "**/*.freezed.dart"
+  - "**/*.mocks.dart"
+  - "**/*.config.dart"
+```
+
+Provide your own `exclude` list to replace these defaults (use `exclude: []` to process everything).
 
 **Example:**
 

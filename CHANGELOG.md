@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Unreleased
+
+- Speed up analysis with a persistent on-disk analyzer cache (`.dart_tool/import_ozempic/analysis-cache/<version>`)
+- Evict stale analysis caches and AOT binaries when the package version changes
+- Fix Dart SDK discovery when running as an AOT binary (no longer treats `~/.import_ozempic` as the SDK)
+- Defer full library resolution until after exclude / part-file filtering
+- Skip generated files during directory walks by default (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `*.config.dart`)
+- Resolve and rewrite libraries in parallel
+- Auto-compile a native AOT binary on first CLI run (disable with `IOZ_NO_AOT=1`; force with `--recompile`)
+
 ## 0.0.20 | 6.2.26
 
 - Add `sober` command to collapse granular package imports back to barrel exports (`package:name/name.dart`) when the barrel file exists on disk
