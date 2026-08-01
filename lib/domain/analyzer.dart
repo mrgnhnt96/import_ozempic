@@ -3,6 +3,7 @@ import 'dart:io' as io;
 import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/file_system/overlay_file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/src/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/src/dart/analysis/byte_store.dart';
@@ -29,11 +30,9 @@ const _byteStoreMaxSizeBytes = 256 * 1024 * 1024;
 const _memoryCacheMaxSizeBytes = 64 * 1024 * 1024;
 
 class Analyzer {
-  Analyzer() : _provider = PhysicalResourceProvider(), _analysisOptions = [];
+  Analyzer() : _provider = OverlayResourceProvider(PhysicalResourceProvider());
 
-  final List<AnalysisOptions> _analysisOptions;
-
-  PhysicalResourceProvider _provider;
+  final OverlayResourceProvider _provider;
   AnalysisContextCollection? _analysisCollection;
   AnalysisContextCollection get analysisCollection {
     if (_analysisCollection case final collection?) {
@@ -55,29 +54,13 @@ class Analyzer {
       false => fs.file(root).absolute.path,
     };
 
-    final analysisOptions = await find.file(
-      AnalysisOptions.name,
-      workingDirectory: fs.currentDirectory.path,
-    );
-
-    for (final option in analysisOptions) {
-      final file = fs.file(option);
-      if (!file.existsSync()) {
-        continue;
-      }
-
-      final options = AnalysisOptions(path: option)..makeTemporary();
-
-      _analysisOptions.add(options);
-    }
+    await _overlayClearedAnalysisOptions(path);
 
     final cachePath = _ensureCacheDirectory(path);
-    final excludedPaths = _defaultExcludedPaths(path);
 
     try {
       _analysisCollection = AnalysisContextCollectionImpl(
         includedPaths: [path],
-        excludedPaths: excludedPaths,
         resourceProvider: _provider,
         sdkPath: sdkPath,
         byteStore: MemoryCachingByteStore(
@@ -93,11 +76,43 @@ class Analyzer {
     }
   }
 
-  Future<void> dispose() async {
-    for (final option in _analysisOptions) {
-      option.restore();
-    }
+  /// Clears `analyzer.exclude` via overlays so generated/barrel files stay
+  /// resolvable, without moving `analysis_options.yaml` on disk.
+  Future<void> _overlayClearedAnalysisOptions(String root) async {
+    final searchRoots = <String>{
+      root,
+      fs.currentDirectory.path,
+    };
 
+    final seen = <String>{};
+    for (final searchRoot in searchRoots) {
+      final optionsPaths = await find.file(
+        AnalysisOptions.name,
+        workingDirectory: searchRoot,
+      );
+
+      for (final optionsPath in optionsPaths) {
+        final normalized = fs.path.normalize(optionsPath);
+        if (!seen.add(normalized)) {
+          continue;
+        }
+
+        final file = fs.file(normalized);
+        if (!file.existsSync()) {
+          continue;
+        }
+
+        final cleared = AnalysisOptions.clearExcludes(file.readAsStringSync());
+        _provider.setOverlay(
+          normalized,
+          content: cleared,
+          modificationStamp: file.lastModifiedSync().millisecondsSinceEpoch,
+        );
+      }
+    }
+  }
+
+  Future<void> dispose() async {
     await _analysisCollection?.dispose();
     _analysisCollection = null;
   }
@@ -225,12 +240,5 @@ class Analyzer {
 
     io.Directory(cachePath).createSync(recursive: true);
     return cachePath;
-  }
-
-  List<String> _defaultExcludedPaths(String root) {
-    return [
-      for (final name in ['.dart_tool', 'build'])
-        fs.path.join(root, name),
-    ];
   }
 }

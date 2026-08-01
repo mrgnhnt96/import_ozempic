@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Clear `analyzer.exclude` via an in-memory overlay instead of moving `analysis_options.yaml` on disk
 - Speed up analysis with a persistent on-disk analyzer cache (`.dart_tool/import_ozempic/analysis-cache/<version>`)
 - Evict stale analysis caches and AOT binaries when the package version changes
 - Fix Dart SDK discovery when running as an AOT binary (no longer treats `~/.import_ozempic` as the SDK)

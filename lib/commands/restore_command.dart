@@ -7,9 +7,11 @@ import 'package:import_ozempic/domain/args.dart';
 const _usage = '''
 Usage: import_ozempic restore
 
-Restores the analysis options files to their original location.
+Restores leftover analysis_options.yaml.tmp files from older import_ozempic
+versions that temporarily moved analysis options on disk.
 
-analysis_options.yaml.tmp files will be restored to their original location.
+Newer versions clear analyzer excludes via an in-memory overlay and no longer
+create these files.
 
 Flags:
   --help     Print this help message
