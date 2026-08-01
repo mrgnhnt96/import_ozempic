@@ -31,7 +31,7 @@ String resolveDartSdkPath({
     }
   }
 
-  final dartOnPath = (which ?? _whichSync)?.call('dart');
+  final dartOnPath = (which ?? _whichSync).call('dart');
   if (dartOnPath != null) {
     final sdk = path.normalize(path.dirname(path.dirname(dartOnPath)));
     if (_looksLikeSdk(sdk, path)) {
